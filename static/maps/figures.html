@@ -1,0 +1,98 @@
+<head>
+    <style> body { margin: 0; } </style>
+  
+    <script src="//cdn.jsdelivr.net/npm/3d-force-graph"></script>
+    <!--<script src="../../dist/3d-force-graph.js"></script>-->
+  </head>
+  
+  <body>
+    <div id="3d-graph"></div>
+  
+    <script type="module">
+      import * as THREE from 'https://esm.sh/three';
+
+      // Simple glow helper
+      function makeGlowSprite(color, size) {
+        // Slightly larger, translucent halo around the image sprite
+        const glowMaterial = new THREE.SpriteMaterial({
+          color,
+          transparent: true,
+          opacity: 0.2,
+          depthWrite: false
+        });
+        const glowSprite = new THREE.Sprite(glowMaterial);
+        glowSprite.scale.set(size * 1.2, size * 1.2);
+        return glowSprite;
+      }
+
+      // Initialize graph
+      const Graph = ForceGraph3D()(document.getElementById('3d-graph'))
+        .nodeThreeObject(({ name }) => {
+          const file = name.startsWith('figures/') ? name : `images/figures/${name}`;
+          const imgTexture = new THREE.TextureLoader().load(`../${file}`);
+          imgTexture.colorSpace = THREE.SRGBColorSpace;
+          const material = new THREE.SpriteMaterial({ map: imgTexture, depthWrite: false });
+
+          const group = new THREE.Group();
+          const sprite = new THREE.Sprite(material);
+          const size = 30;
+          sprite.scale.set(size, size);
+          group.add(sprite);
+
+          const glow = makeGlowSprite(0xffffff, size);
+          group.add(glow);
+
+          return group;
+        })
+        .nodeThreeObjectExtend(false)
+        // .nodeAutoColorBy('type')
+        .onNodeClick(node => {
+          // Aim at node from outside it
+          const distance = 40;
+          const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+          const newPos = node.x || node.y || node.z
+            ? { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }
+            : { x: 0, y: 0, z: distance }; // special case if node is in (0,0,0)
+
+          Graph.cameraPosition(
+            newPos, // new position
+            node, // lookAt ({ x, y, z })
+            3000  // ms transition duration
+          );
+        });
+      
+      // Slow down the initial settling animation
+      Graph.d3VelocityDecay(.8); // more damping, gentler motion
+      Graph.d3AlphaDecay(0.0);   // cool the simulation more slowly
+      Graph.cooldownTime(15000);  // keep forces running longer but at a slower pace
+      Graph.d3Force('charge').strength(-120);
+      
+
+      // Load data and render
+      fetch('figures.json')
+        .then(res => res.json())
+        .then(data => Graph.graphData(data));
+      
+        // gently orbit the camera around the scene
+      const ORBIT_DISTANCE = 700;
+      const ORBIT_STEP = Math.PI / 480;
+      let orbitAngle = 0;
+      let orbitPauseUntil = 0;
+
+      const orbitCamera = () => {
+        const now = performance.now();
+        if (now >= orbitPauseUntil) {
+          const x = ORBIT_DISTANCE * Math.sin(orbitAngle);
+          const z = ORBIT_DISTANCE * Math.cos(orbitAngle);
+          Graph.cameraPosition({ x, y: ORBIT_DISTANCE * 0.05, z });
+          orbitAngle += ORBIT_STEP;
+        }
+        requestAnimationFrame(orbitCamera);
+      };
+
+      // Graph.cameraPosition({ x: 0, y: ORBIT_DISTANCE * 0.05, z: ORBIT_DISTANCE });
+      // orbitCamera();
+
+    </script>
+  </body>

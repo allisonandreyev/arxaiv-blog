@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>arxAIv — 100 Papers That Were Never Written</title>
+  <meta name="description"
+        content="An explorable look at 100 AI-generated computer-vision papers: what a CLIP embedding sees in a fake scientific figure, and why it isn't what you see.">
+  <meta name="author" content="Allison Andreyev">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="arxAIv — 100 Papers That Were Never Written">
+  <meta property="og:description"
+        content="What a CLIP embedding sees in a fake scientific figure, and why it isn't what you see.">
+  <meta property="og:image" content="static/images/FigMap1.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro:400,400i,700&display=swap"
+        rel="stylesheet">
+  <link rel="stylesheet" href="static/css/blog.css">
+  <link rel="icon" href="static/images/favicon.svg">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════ masthead -->
+<header class="masthead">
+  <div class="prose">
+    <div class="eyebrow">Submitted to VISxAI 2026 · IEEE VIS, Boston</div>
+    <h1>100 Papers That Were Never Written</h1>
+    <p class="sub">Nobody typed a word of this corpus. Image models <em>drew</em> the pages: title
+      block, author list, references and all. This is what an embedding model notices about them
+      that you don't.</p>
+    <p class="byline"><strong>Allison Andreyev</strong> · an explorable about CLIP embeddings,
+      nearest neighbours, and the gap between looking scientific and being scientific</p>
+    <div class="pills">
+      <a class="pill" href="#quiz-sec">▶ Start with the test</a>
+      <a class="pill" href="https://github.com/allisonandreyev/arxAIv">Code</a>
+      <a class="pill" href="https://github.com/allisonandreyev/arxaiv.github.io/releases/tag/v0.5">Dataset</a>
+      <a class="pill" href="https://youtu.be/EyoskUy2ZXo">Video</a>
+    </div>
+
+    <nav class="toc">
+      <h4>What's in here</h4>
+      <ol>
+        <li><a href="#quiz-sec">A test you will probably fail</a></li>
+        <li><a href="#corpus">Where the corpus came from</a></li>
+        <li><a href="#embedding">Turning a figure into 512 numbers</a></li>
+        <li><a href="#map">The map</a></li>
+        <li><a href="#line">Drawing a line through it</a></li>
+        <li><a href="#why">Is it just that fakes look different?</a></li>
+        <li><a href="#inside">Inside the generated half</a></li>
+        <li><a href="#text">The text layer falls apart first</a></li>
+        <li><a href="#people">Three hundred and forty people who don't exist</a></li>
+        <li><a href="#field">A whole field, hallucinated</a></li>
+        <li><a href="#limits">What this does and doesn't show</a></li>
+      </ol>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ══════════════════════════════════════════════════════════ 0. hero -->
+<section id="hero">
+  <div class="fig-full hero-block">
+    <figure>
+      <iframe class="embed3d is-hero" src="static/maps/both_figures.html"
+              title="3D graph of 269 generated and real scientific figures"></iframe>
+      <figcaption><b>Every figure in this post, floating in CLIP space.</b>
+        <span data-n="gen-figs">156</span> of these were drawn by an image model
+        (<span style="color:var(--ai)">blue halo</span>);
+        <span data-n="real-figs">113</span> were cropped from real computer-vision papers
+        (<span style="color:var(--real)">orange halo</span>). Drag to rotate, scroll to zoom, click a thumbnail to fly
+        to it. The rest of this post is about why they separate the way they do, and why it isn't
+        for the reason you'd guess.</figcaption>
+    </figure>
+  </div>
+
+  <div class="fig-wide">
+    <figure>
+      <div class="video-frame">
+        <iframe src="https://www.youtube.com/embed/EyoskUy2ZXo"
+                title="arxAIv — walkthrough of the generated corpus"
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+      </div>
+      <figcaption>Two minutes of the archive, end to end</figcaption>
+    </figure>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 1. quiz -->
+<section id="quiz-sec">
+  <div class="prose">
+    <h2><span class="sec-num">01</span>An ambiguous test</h2>
+    <p class="lede">Below are pairs of scientific figures. One in each pair was cropped from a real
+      computer-vision paper. The other was drawn by an image generator that had never seen a
+      dataset, run an experiment, or plotted a number.</p>
+    <p>One catch: <b>both images start blurred.</b> Sharp, the test is too easy to be interesting,
+      because generated figures give themselves away with <em>text</em>. Axis labels dissolve into
+      letter-shaped smears, legends repeat themselves, a word comes out almost but not quite
+      "Detection." Blurring both images equally takes all that off the table and leaves the harder
+      question: does the <em>structure</em> of this figure make sense? Each pair sharpens the moment
+      you answer, so you can see what you were missing. (Turn the blur off if you'd rather play on
+      easy.)</p>
+  </div>
+
+  <div class="fig-wide needs-data" id="quiz">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Real or generated?</span>
+        <span class="controls">
+          <button class="btn quiz-blur" type="button" aria-pressed="true">Blur the text</button>
+          <span class="quiz-score"><b>0</b> / 0 correct</span>
+        </span>
+      </div>
+      <div class="quiz-stage"></div>
+      <div class="quiz-bar">
+        <span class="quiz-msg"></span>
+        <span style="display:flex;gap:1rem;align-items:center">
+          <span class="quiz-dots"></span>
+          <button class="btn quiz-next" type="button" style="visibility:hidden">Next pair →</button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>Blurred, most people sit near chance for a while, then start reading composition instead of
+      type: a pipeline diagram whose arrows loop back into themselves, a bar chart with no
+      baseline, a colour bar that shades from blue to blue.</p>
+    <p>An embedding model does none of that. It turns each figure into a list of numbers and never
+      looks at the pixels again. By the end of this post, a straight line drawn through two of those
+      numbers will separate the same <span data-n="total-figs">269</span> images with
+      <b><span data-n="lda-acc">87.0%</span></b> accuracy.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 2. corpus -->
+<section id="corpus">
+  <div class="prose">
+    <h2><span class="sec-num">02</span>Where the corpus came from</h2>
+    <p>The usual worry about AI and publishing is that a language model wrote your abstract. This
+      corpus is about a stranger case: what if nothing was <em>written</em> at all?</p>
+    <p>Every page in <em class="term">arxAIv</em> is an image. A single prompt —
+      <em>"generate a CVPR conference paper; the page should include methodology, experimentation,
+      and scientific figures"</em> — was run through a spread of text-to-image and multimodal
+      systems: <code>Stable Diffusion 3.5-Large</code>, <code>FLUX.1-schnell</code>,
+      <code>Qwen-Image</code>, <code>HunyuanImage 3.0</code>, <code>HiDream-L1</code>,
+      <code>Gemini 2.5 Flash</code>, <code>GPT-5.1</code>, and <code>Sora</code>. What comes back
+      isn't a document. It's a <em>picture</em> of one: two columns of type that resolve into
+      letterforms at a distance and into nonsense up close, an author block, an affiliation line, a
+      reference list, and one or more figures.</p>
+    <p>I then treated those pages as if they were real artifacts and put them through the kind of
+      forensics no reviewer has time for: OCR, embedding, clustering, and a hand audit of every
+      institution and every citation.</p>
+  </div>
+
+  <div class="stats fig-wide">
+    <div class="stat"><span class="n" data-n="papers">100</span><span class="l">generated paper pages</span></div>
+    <div class="stat ai"><span class="n" data-n="gen-figs">156</span><span class="l">figures cropped from them</span></div>
+    <div class="stat real"><span class="n" data-n="real-figs">113</span><span class="l">real figures, for contrast</span></div>
+    <div class="stat"><span class="n" data-n="authors">340</span><span class="l">author names invented</span></div>
+    <div class="stat"><span class="n" data-n="affiliations">317</span><span class="l">affiliations claimed</span></div>
+  </div>
+
+  <div class="fig-wide">
+    <figure>
+      <div class="strip">
+        <figure>
+          <img src="static/images/Paper2.png" alt="A generated CVPR-style paper page" loading="lazy">
+          <figcaption>Convincing at arm's length…</figcaption>
+        </figure>
+        <figure>
+          <img src="static/images/Paper5.png" alt="A generated paper page with malformed text" loading="lazy">
+          <figcaption>…less so at reading distance.</figcaption>
+        </figure>
+        <figure>
+          <img src="static/images/Paper9.png" alt="A generated paper page with a fabricated figure" loading="lazy">
+          <figcaption>The figures are the part that gives up first.</figcaption>
+        </figure>
+      </div>
+      <figcaption><b>Three of the hundred.</b> Nothing here was typed. The layout, the typography,
+        the two-column grid, the little superscript affiliation markers: all of it is texture the
+        model learned to paint. Click any image later in this post to see it full size.</figcaption>
+    </figure>
+  </div>
+
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 3. embedding -->
+<section id="embedding">
+  <div class="prose">
+    <h2><span class="sec-num">03</span>Turning a figure into 512 numbers</h2>
+    <p>To compare 269 images to each other we need something better than "they look similar."
+      The tool for that is an <em class="term">embedding</em>: a function that maps an image to a
+      point in a high-dimensional space, trained so that images meaning similar things land near
+      each other.</p>
+    <p>Here that function is <code>OpenCLIP ViT-B-32</code>, pretrained on
+      <code>laion2b_s34b_b79k</code>. It chops each figure into 32×32 patches, runs them through a
+      vision transformer, and emits <b>512 numbers</b>. Nothing about it was tuned on scientific
+      figures, and nobody ever told it which of ours are fake. Its whole training goal was "match
+      this image to its caption."</p>
+
+    <div class="aside">
+      <h4>How to read a distance</h4>
+      <p>Two embeddings are compared by <em>cosine similarity</em>: the cosine of the angle between
+        the two 512-dimensional vectors. It runs from −1 (opposite) through 0 (unrelated) to 1
+        (identical direction). Magnitude is thrown away, so a bright figure and a dim one with the
+        same content still score high.</p>
+      <p>Averaged over every pair within and between the two sets:</p>
+      <p style="font-family:var(--mono);font-size:.86rem;line-height:1.9">
+        generated ↔ generated &nbsp;<b data-n="sim-g2g">0.496</b><br>
+        real ↔ real &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b data-n="sim-r2r">0.485</b><br>
+        generated ↔ real &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b data-n="sim-g2r">0.445</b>
+      </p>
+      <p>Compare the third line to the first two. Generated figures look more like each other than
+        like real work, and — this is the odd part — more like each other than real figures do.
+        That's what you'd expect from a corpus drawn out of one aesthetic instead of a few hundred
+        labs with their own plotting habits.</p>
+    </div>
+
+    <p>Averages hide structure, though. Seeing the structure means looking at the whole corpus at
+      once, which means squeezing 512 dimensions down to two.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════ 4. map -->
+<section id="map">
+  <div class="prose">
+    <h2><span class="sec-num">04</span>The map</h2>
+    <p><em class="term">Principal component analysis</em> finds the directions along which the
+      corpus varies most and keeps the top few. It's unsupervised — nobody tells PCA which figures
+      are generated. All it knows is that the cloud of 269 points is stretched further along some
+      axes than others, and it keeps the longest ones.</p>
+    <p>Below is the corpus projected onto the first two of those axes. Colour is the ground truth
+      that PCA never saw. <b>Hover any point to see the figure it stands for; click to open it.</b></p>
+  </div>
+
+  <div class="fig-full needs-data" id="embed-map">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="legend">
+          <span><span class="swatch ai"></span>generated (<span data-n="gen-figs">156</span>)</span>
+          <span><span class="swatch real"></span>real (<span data-n="real-figs">113</span>)</span>
+        </span>
+        <span class="controls">
+          <button class="btn" type="button" data-show="all" aria-pressed="true">Both</button>
+          <button class="btn ai" type="button" data-show="ai" aria-pressed="false">Generated only</button>
+          <button class="btn real" type="button" data-show="real" aria-pressed="false">Real only</button>
+          <button class="btn" type="button" data-toggle="edges" aria-pressed="false">8 nearest neighbours</button>
+          <button class="btn" type="button" data-toggle="boundary" aria-pressed="false">Decision line</button>
+        </span>
+      </div>
+      <div class="chart-holder"><canvas class="chart"></canvas></div>
+    </div>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem"><b>269 scientific figures in CLIP space,
+      projected to two dimensions.</b> Orange is human-made, blue is generated. PCA had no labels. Turn on <i>8 nearest neighbours</i>
+      to draw each figure's links to its eight closest neighbours in the full 512-dimensional
+      space; edges that cross between the two populations are drawn in red.</figcaption>
+  </div>
+
+  <div class="prose">
+    <p>The two populations pile up in different places, with a contested middle. To quantify that
+      without leaning on the projection, throw the projection away and ask a local question back in
+      the original 512 dimensions: <b>if I stand on a figure and look at its eight nearest
+      neighbours, how many are the same kind as me?</b></p>
+    <p>Across all <span data-n="knn-edges">2,147</span> neighbour links,
+      <b><span data-n="knn-same">84.9%</span></b> stay within their own population.
+      Generated figures are slightly more clannish than real ones —
+      <span data-n="knn-gen">87.1%</span> of their neighbours are also generated, against
+      <span data-n="knn-real">81.7%</span> for real figures. A model trained only on
+      image–caption pairs, given no notion that "AI-generated" is a category, sorts them anyway.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 5. line -->
+<section id="line">
+  <div class="prose">
+    <h2><span class="sec-num">05</span>Drawing a line through it</h2>
+    <p>Neighbour purity is a local statement. The global version of the question is a classifier,
+      and the simplest one worth trusting is <em class="term">linear discriminant analysis</em>:
+      find the single direction that pulls the two class means apart best relative to their spread,
+      project every point onto it, cut at the midpoint. One direction, one threshold, no hidden
+      layers.</p>
+    <p>Fitting that on just PC₁ and PC₂ — the two axes in the map above — and evaluating it
+      <em>leave-one-out</em>, so every figure is scored by a line fitted without it:</p>
+  </div>
+
+  <div class="fig-wide needs-data" id="discriminant">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Where each figure lands on the discriminant</span>
+        <span class="legend">
+          <span><span class="swatch ai"></span>generated</span>
+          <span><span class="swatch real"></span>real</span>
+          <span style="color:var(--ink-faint)">dark outline = misclassified</span>
+        </span>
+      </div>
+      <div class="chart-holder"><canvas class="chart"></canvas></div>
+    </div>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem"><b>One number per figure.</b> Everything
+      left of the dashed line is called generated, everything right of it is called real.
+      <span data-n="lda-miss">35</span> of <span data-n="total-figs">269</span> figures fall on the
+      wrong side — <b><span data-n="lda-acc">87.0%</span></b> correct, against
+      <span data-n="lda-base">58.0%</span> for a classifier that always guesses the majority class.
+      Hover the outlined dots — they're the interesting ones. Real figures that read as synthetic
+      tend to be sparse schematics. Generated figures that read as real tend to be dense scatter
+      plots where the eye has nothing to catch on.</figcaption>
+  </div>
+
+  <div class="prose">
+    <p>PC₁ alone already gets <span data-n="lda-pc1">75.8%</span>. The second component adds another
+      eleven points. Two numbers out of five hundred and twelve.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════ 6. why -->
+<section id="why">
+  <div class="prose">
+    <h2><span class="sec-num">06</span>Is it just that fakes look different?</h2>
+    <p>Here's the obvious objection, and it deserves a test rather than a paragraph of reassurance.
+      Maybe CLIP isn't detecting anything semantic at all. Maybe generated figures are just
+      blurrier, or more colourful, or more crowded, and any dumb pixel statistic would do the same
+      job.</p>
+    <p>So I computed seven cheap appearance statistics over the same 269 images — edge density, ink
+      coverage, colourfulness, mean saturation, tonal entropy, white space, aspect ratio — and
+      asked each one, on its own, to separate the corpus.</p>
+  </div>
+
+  <div class="fig-wide needs-data">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">How well each pixel statistic separates real from generated</span></div>
+      <div class="bars" id="pixel-bars"></div>
+      <p class="dek" style="margin-top:.8rem">Bar length is scaled from AUC 0.5 (coin flip, no bar)
+        to AUC 1.0 (perfect). The best of them reaches <b data-n="pixel-best-auc">0.589</b>.</p>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>Essentially nothing. Real figures have marginally busier edges and a bit more colour, and
+      generated figures fill a bit more of the page with ink, but every one of those differences is
+      small enough to drown in the variation <em>within</em> each group. Throw all seven into a
+      classifier together and you get <b data-n="pixel-acc">63.9%</b>, six points above guessing.</p>
+  </div>
+
+  <div class="fig-wide needs-data">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Leave-one-out accuracy, by what the classifier is allowed to see</span></div>
+      <div class="bars" id="ablation-bars"></div>
+    </div>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem"><b>The ablation.</b> Low-level
+      appearance carries almost none of the signal, two CLIP components carry most of it, and the
+      two are complementary enough that putting them together reaches
+      <b data-n="both-acc">94.8%</b>. Whatever CLIP has picked up on, it isn't the surface.</figcaption>
+  </div>
+
+  <div class="prose">
+    <p>That gap is the finding. CLIP isn't measuring how these images look; it's measuring what they
+      seem to be <em>about</em>. And generated figures are about a narrower, more repetitive set of
+      things than a real conference proceedings is. They inherit one model's idea of what a chart
+      is, over and over.</p>
+    <div class="aside caution">
+      <h4>One caveat</h4>
+      <p>The PCA was fitted on all 269 figures before the leave-one-out loop, so the projection has
+        seen the whole corpus, even though no classifier ever saw the held-out label. That makes
+        these numbers a little optimistic as an estimate of how well any of this would work on
+        figures from <em>outside</em> the collection. It doesn't affect the comparison between rows,
+        pixels versus CLIP, since both were scored the same way.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 7. inside -->
+<section id="inside">
+  <div class="prose">
+    <h2><span class="sec-num">07</span>Inside the generated half</h2>
+    <p>CLIP tells us the two populations differ. It doesn't tell us <em>how</em> a fake figure
+      fails. For that I ran four hand-built diagnostics over the
+      <span data-n="gen-figs">156</span> generated figures:</p>
+    <ul class="tight">
+      <li><b>CLIP caption agreement</b> — cosine similarity between the figure and the caption
+        printed beneath it. Low means the picture and its own caption are about different things.</li>
+      <li><b>Structural complexity</b> — density of edges and contours in the rendered panel.</li>
+      <li><b>Gibberish ratio</b> — share of OCR-recovered tokens that are not words in any language.</li>
+      <li><b>Repetition</b> — count of duplicated glyph runs, the telltale of a model that has lost
+        its place mid-legend.</li>
+    </ul>
+    <p>Pick any two and look for structure. Hover a point to see the figure behind it.</p>
+  </div>
+
+  <div class="fig-wide needs-data" id="metric-explorer">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="controls">
+          <label>x <select class="btn" data-axis="x" aria-label="x axis metric"></select></label>
+          <label>y <select class="btn" data-axis="y" aria-label="y axis metric"></select></label>
+        </span>
+        <span class="panel-title metric-r"></span>
+      </div>
+      <div class="chart-holder"><canvas class="chart"></canvas></div>
+    </div>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem"><b>156 generated figures, four
+      diagnostics.</b> These describe the failure modes of the synthetic half; they are not a
+      detector, because the real figures were never scored on the same scales.</figcaption>
+  </div>
+
+  <div class="prose">
+    <p>The distributions are the story. Caption agreement averages
+      <b data-n="clip-mean">0.628</b> and bottoms out at <b data-n="clip-min">0.269</b>, a figure
+      whose own caption describes something else entirely. The gibberish ratio averages
+      <b data-n="gib-mean">0.119</b>, so about one token in eight inside a typical generated figure
+      isn't a word, and it peaks at <b data-n="gib-max">0.451</b>: nearly half the text in that
+      panel is letterlike shapes arranged into nothing.</p>
+    <p>None of it correlates cleanly, either. A figure can be structurally intricate and completely
+      illegible. It can be perfectly legible and describe the wrong experiment. There's no single
+      "wrongness" axis, which is why 512 dimensions beat any one of these four.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 8. text -->
+<section id="text">
+  <div class="prose">
+    <h2><span class="sec-num">08</span>The text layer falls apart first</h2>
+    <p>Because these pages are pictures, their text has no ground truth. It has to be OCR'd back
+      out, which is its own kind of forensics, and what comes out is uncanny. The <em>shape</em> of
+      scientific writing is intact: an abstract that says a method is proposed, an introduction that
+      lists applications, a reference list with bracketed numbers and et-als. Underneath, it's all
+      scaffolding.</p>
+    <p>Structurally, <b>69%</b> of the hundred pages are complete. The rest are missing a piece
+      outright; <span data-n="notitle">21</span> pages never render a title at all.</p>
+  </div>
+
+  <div class="fig-wide needs-data">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Structural completeness across the 100 pages</span></div>
+      <div class="bars" id="struct-bars"></div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>Browse the archive yourself. Every page is here, with the text OCR'd off it, its reference
+      list, and the topic cluster it landed in. Filter to the broken ones and the pattern shows up
+      right away: a paper that fails structurally usually fails <em>silently</em>, dropping the
+      title or the citations while keeping every other visual cue of legitimacy.</p>
+  </div>
+
+  <div class="fig-full needs-data" id="paper-explorer">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">All 100 generated papers</span>
+        <span class="controls">
+          <button class="btn" type="button" data-filter="all" aria-pressed="true">All</button>
+          <button class="btn" type="button" data-filter="broken" aria-pressed="false">Structurally broken</button>
+          <button class="btn" type="button" data-filter="clean" aria-pressed="false">Complete</button>
+          <button class="btn" type="button" data-filter="1" aria-pressed="false">Object detection</button>
+          <button class="btn" type="button" data-filter="2" aria-pressed="false">Segmentation</button>
+          <button class="btn" type="button" data-filter="3" aria-pressed="false">Generation</button>
+          <button class="btn" type="button" data-filter="4" aria-pressed="false">Localization</button>
+          <button class="btn" type="button" data-filter="5" aria-pressed="false">Features</button>
+        </span>
+      </div>
+      <div class="paper-grid"></div>
+      <div class="paper-detail"></div>
+    </div>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem"><b>The archive.</b> Click any page.
+      Greyed-out pages don't match the current filter. The excerpts are what OCR actually recovered
+      — the malapropisms ("acrial imegery", "Image Matehing") are in the generated pixels, not
+      introduced by transcription.</figcaption>
+  </div>
+
+  <div class="prose">
+    <p>The reference lists are the worst of it. They cite real-sounding authors in real-sounding
+      venues, and where a citation does land near a paper that exists, it lands near an
+      <em>obvious</em> one — the most-cited work in that subfield, reworded. Paper 1's nearest real
+      neighbour is <i>ORSIm Detector</i>, paper 10's is <i>SuperGlue</i>, paper 100's is
+      <i>Object Detection with Transformers: A Review</i>. The model isn't inventing a literature.
+      It's reciting the most famous parts of one, slightly wrong.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 9. people -->
+<section id="people">
+  <div class="prose">
+    <h2><span class="sec-num">09</span>Three hundred and forty people who don't exist</h2>
+    <p>I checked every affiliation on all hundred pages by hand and sorted them into three kinds:
+      <b>hallucinated</b> (the institution doesn't exist), <b>mutated</b> (a real institution
+      wearing a wrong name — <i>University of Adelaid</i>, <i>Sun Yat Tsen</i>), and real.</p>
+  </div>
+
+  <div class="fig-wide needs-data">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Where the 317 claimed affiliations come from</span>
+        <span class="legend">
+          <span style="color:var(--warn)">■ invented</span>
+          <span style="color:var(--real)">■ mutated</span>
+          <span style="color:var(--ai)">■ real institution</span>
+        </span>
+      </div>
+      <div class="bars" id="aff-bars"></div>
+    </div>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem"><b>Roughly a third of authors
+      (<span data-n="hall-pct">31.5%</span>) are attributed to institutions that do not exist,</b>
+      and another <span data-n="mut-pct">22.6%</span> to real institutions rendered under a name
+      that isn't theirs. Among the ones the model did get right, the ranking is just a popularity
+      contest: Stanford, Toronto, MIT, Berkeley, Google/DeepMind, CMU.</figcaption>
+  </div>
+
+  <div class="prose">
+    <p>The names collapse toward the mode in the same way. Across 340 invented authors, the surname
+      distribution is far narrower than any real conference roster:</p>
+  </div>
+
+  <div class="fig-wide needs-data">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Most common invented surnames</span></div>
+      <div class="bars" id="surname-bars"></div>
+      <p class="dek" style="margin-top:.8rem">"Chen" appears 28 times among 340 authors. At the
+        level of full names, <i>Kevin Chen</i> shows up four times, <i>David Chen</i> four times,
+        and <i>John Doe</i> four times — which is either a sampling artefact or the model telling
+        on itself.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 10. field -->
+<section id="field">
+  <div class="prose">
+    <h2><span class="sec-num">10</span>A whole field, hallucinated</h2>
+    <p>Embed the hundred titles with <code>all-MiniLM-L6-v2</code>, link each to its nearest
+      neighbours, and let the graph settle. What you get is a plausible map of computer vision circa
+      the model's training data: five topic clusters, sized about the way you'd expect them to be
+      sized.</p>
+  </div>
+
+  <div class="fig-wide needs-data">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">The five clusters the titles fall into</span></div>
+      <div class="bars" id="cluster-bars"></div>
+    </div>
+  </div>
+
+  <div class="fig-full">
+    <figure>
+      <iframe class="embed3d" src="static/maps/papers-glow.html" title="3D graph of 100 generated paper titles" loading="lazy"></iframe>
+      <figcaption><b>The title graph, in three dimensions.</b> Drag to rotate, scroll to zoom, click
+        a node to fly to it. Each node is one of the hundred papers; edges join titles that are
+        close in sentence-embedding space. The clustering is real — the field it describes is not.</figcaption>
+    </figure>
+  </div>
+
+  <div class="prose">
+    <p>The figure map at the top of this page should read differently now. That cloud of thumbnails
+      is the same <span data-n="total-figs">269</span> figures as section 4, in three dimensions
+      instead of two — the view the flat map was compressed out of. Blue haloes are generated,
+      orange are real, and the blue mass holds together more tightly for the reason section 3
+      already suggested: one aesthetic, not several hundred.</p>
+    <p>This is the part that unsettles me most. The individual artifacts are shoddy, and section 1
+      probably proved you can catch them eventually. But in aggregate they reproduce the
+      <em>shape</em> of a research field surprisingly well: subtopics in roughly the right
+      proportions, the institutional pecking order more or less intact, plausible citation habits,
+      the correct visual grammar. The structure survives even though every fact inside it is
+      false.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══════════════════════════════════════════════════════════ 11. limits -->
+<section id="limits">
+  <div class="prose">
+    <h2><span class="sec-num">11</span>What this does and doesn't show</h2>
+    <p>Three limits, up front, because an explorable that only shows its wins isn't much of an
+      explanation.</p>
+    <ul class="tight">
+      <li><b>This is not a detector.</b> 269 figures from one prompt, run through eight generators,
+        against 113 real figures I picked myself. A classifier fitted here wouldn't survive contact
+        with next year's models, and it shouldn't be used to accuse anyone of anything.</li>
+      <li><b>The comparison sets aren't matched.</b> Real figures came out of published
+        computer-vision papers; generated ones were cropped out of synthetic pages. Differences in
+        cropping, resolution, and rendering pipeline are tangled up with the thing I'm trying to
+        measure. The pixel-statistic ablation in section 6 is an attempt to bound that, not proof
+        it's absent.</li>
+      <li><b>The diagnostics in section 7 only ran on the generated half.</b> They describe how
+        synthetic figures fail. They say nothing about how often real ones would trip the same
+        thresholds, and several probably would.</li>
+    </ul>
+    <p>What it does show, I think, holds up. A general-purpose embedding model, never trained for
+      this task, encodes something about synthetic scientific figures that survives compression down
+      to two numbers and isn't reducible to how they look. And a corpus with no facts in it can
+      still reconstruct the sociology of a field: its topics, its institutions, its citation
+      reflexes, its house style.</p>
+    <p>That second gap, between a field's form and its content, is what this project is pointing at.
+      Right now you can still see it. It's getting narrower.</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════════════════════════════════════════════════════ colophon -->
+<footer class="colophon">
+  <div class="prose">
+    <h3>Data &amp; reproduction</h3>
+    <p>Figure embeddings: <code>OpenCLIP ViT-B-32</code> / <code>laion2b_s34b_b79k</code>,
+      L2-normalised, standardised, reduced with PCA, joined into a <i>k</i>=8 cosine nearest-neighbour
+      graph. Title embeddings: <code>all-MiniLM-L6-v2</code>. Classifiers are leave-one-out linear
+      discriminant analysis. Affiliation and reference audits are manual. Everything the page draws
+      lives in <code>static/data/arxaiv.json</code>; the notebook that produced the embeddings ships
+      with the dataset release.</p>
+    <p><a href="https://github.com/allisonandreyev/arxAIv">Code</a> ·
+      <a href="https://github.com/allisonandreyev/arxaiv.github.io/releases/tag/v0.5">Dataset</a> ·
+      <a href="https://youtu.be/EyoskUy2ZXo">Video</a> ·
+      <a href="project-page.html">Original project page</a></p>
+
+    <h3 style="margin-top:2rem">Related reading</h3>
+    <p><a href="https://doi.org/10.1007/s10676-025-09835-4">The ethics of erroneous AI-generated
+      scientific figures</a> ·
+      <a href="https://www.nature.com/articles/d41586-025-01463-8">Is it OK for AI to write science
+      papers?</a> ·
+      <a href="https://www.nature.com/articles/d41586-025-03046-z">Journals infiltrated with
+      "copycat" papers</a> ·
+      <a href="https://doi.org/10.1016/j.oor.2024.100289">AI-generated images in research
+      manuscripts</a> ·
+      <a href="https://dwzhu-pku.github.io/PaperBanana/">PaperBanana</a> ·
+      <a href="https://sakana.ai/ai-scientist-first-publication/">The AI Scientist-v2</a></p>
+
+    <p style="margin-top:2rem">Text and figures licensed
+      <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</p>
+  </div>
+</footer>
+
+<script src="static/js/arxaiv.js"></script>
+</body>
+</html>

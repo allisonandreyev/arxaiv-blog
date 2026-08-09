@@ -1,0 +1,134 @@
+<head>
+  <style>
+    body { margin: 0; font-family: "Times New Roman", Times, serif; }
+  </style>
+
+  <script src="//cdn.jsdelivr.net/npm/3d-force-graph"></script>
+</head>
+
+<body>
+  <div id="3d-graph"></div>
+
+  <script type="module">
+    import * as THREE from "https://esm.sh/three"; 
+    import SpriteText from "https://esm.sh/three-spritetext";
+
+    const CLUSTER_COLORS = {
+      1: "#7bb7ff",
+      2: "#a5d9a5",
+      3: "#f5eaba",
+      4: "#c084c4",
+      5: "#f5ba98"
+    };
+    const LABEL_FONT = '"Times New Roman", Times, serif';
+
+    // Define this function within your <script type="module">
+    function makeGlowSphere(color, radius) {
+      const glowRadius = radius * 1.8; // Make the glow slightly larger than the node
+      
+      // Create a sphere geometry for the glow
+      const geometry = new THREE.SphereGeometry(glowRadius, 24, 24);
+      
+      // Use MeshBasicMaterial: it's not affected by scene lights, making it suitable for a 'glow'.
+      const material = new THREE.MeshBasicMaterial({
+          color: color,
+          transparent: true,
+          opacity: 0.25, // Adjust opacity for the glow intensity
+          side: THREE.BackSide // Render faces pointing away from the camera for a subtle halo effect
+      });
+      
+      const glowMesh = new THREE.Mesh(geometry, material);
+      
+      glowMesh.renderOrder = -1; 
+      return glowMesh;
+    }  
+
+    const Graph = new ForceGraph3D(document.getElementById('3d-graph'))
+        .jsonUrl('papers.json')
+        .nodeAutoColorBy('cluster')
+        .nodeThreeObject(node => {
+  
+          // This value is based on the 'cluster' property as you originally intended
+          const finalColor = CLUSTER_COLORS[node.cluster] || "#cccccc"; 
+          const group = new THREE.Group();
+          const radius = node.size ? node.size : 4;
+
+          // sphere body
+          const sphere = new THREE.Mesh(
+          new THREE.SphereGeometry(radius, 24, 24),
+          new THREE.MeshStandardMaterial({
+              color: finalColor, 
+              roughness: 0.32,
+              metalness: 0.25,
+              emissive: finalColor, 
+              emissiveIntensity: 0.18
+          })
+          );
+          group.add(sphere);
+
+          // glow halo
+          const glow = makeGlowSphere(finalColor, radius); 
+          group.add(glow);
+
+          const sprite = new SpriteText(node.name || "");
+          sprite.material.depthWrite = false;
+          sprite.fontFace = LABEL_FONT;
+          sprite.fontWeight = "700";
+          sprite.color = finalColor;
+          sprite.textHeight = 8;
+          sprite.center.y = -0.6;
+          group.add(sprite);
+
+          return group;})
+        .nodeThreeObjectExtend(true)
+        .onNodeClick(node => {
+          // Aim at node from outside it
+          const distance = 40;
+          const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+          const newPos = node.x || node.y || node.z
+            ? { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }
+            : { x: 0, y: 0, z: distance }; // special case if node is in (0,0,0)
+
+          orbitPauseUntil = performance.now() + 3200; // let the focus animation finish
+          Graph.cameraPosition(
+            newPos, // new position
+            node, // lookAt ({ x, y, z })
+            3000  // ms transition duration
+          );
+        });
+          
+    Graph.d3VelocityDecay(.7); // more damping, gentler motion
+    Graph.d3AlphaDecay(0.0);   // cool the simulation more slowly
+    Graph.cooldownTime(15000);  // keep forces running longer but at a slower pace
+      
+    Graph.d3Force('charge').strength(-120);
+    Graph.linkWidth(1.6);
+
+    // gently orbit the camera around the scene using TS-style annotated vars
+    /** @type {number} */
+    const ORBIT_DISTANCE = 700;
+    /** @type {number} */
+    const ORBIT_STEP = Math.PI / 480;
+    /** @type {number} */
+    let orbitAngle = 0;
+    /** @type {number} */
+    let orbitPauseUntil = 0;
+
+    const orbitCamera = () => {
+      const now = performance.now();
+      if (now >= orbitPauseUntil) {
+        const x = ORBIT_DISTANCE * Math.sin(orbitAngle);
+        const z = ORBIT_DISTANCE * Math.cos(orbitAngle);
+        Graph.cameraPosition({ x, y: ORBIT_DISTANCE * 0.05, z });
+        orbitAngle += ORBIT_STEP;
+      }
+      requestAnimationFrame(orbitCamera);
+    };
+
+    // start pulled back so the whole scene is visible before orbit kicks in
+    // Graph.cameraPosition({ x: 0, y: ORBIT_DISTANCE * 0.05, z: ORBIT_DISTANCE });
+    // orbitCamera();
+
+  </script>
+</body>

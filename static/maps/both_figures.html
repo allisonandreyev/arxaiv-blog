@@ -1,0 +1,146 @@
+<head>
+    <style> body { margin: 0; } </style>
+  
+    <script src="//cdn.jsdelivr.net/npm/3d-force-graph"></script>
+    <!--<script src="../../dist/3d-force-graph.js"></script>-->
+  </head>
+  
+  <body>
+    <div id="3d-graph"></div>
+  
+    <script type="module">
+      import * as THREE from 'https://esm.sh/three';
+
+      // Simple glow helper
+      function makeGlowSprite(color, size) {
+        // Slightly larger, translucent halo around the image sprite
+        const glowMaterial = new THREE.SpriteMaterial({
+          color,
+          transparent: true,
+          opacity: 0.2,
+          depthWrite: false
+        });
+        const glowSprite = new THREE.Sprite(glowMaterial);
+        glowSprite.scale.set(size * 1.2, size * 1.2);
+        return glowSprite;
+      }
+
+      const TYPE_COLORS = {
+        generated: 0x66ccff,
+        real: 0xff8c5a
+      };
+
+      function loadTextureWithFallback(primaryPath, fallbackPath) {
+        // Use a plain Image to control fallback when the primary is missing
+        const texture = new THREE.Texture();
+        texture.colorSpace = THREE.SRGBColorSpace;
+
+        const primaryImg = new Image();
+        primaryImg.onload = () => {
+          texture.image = primaryImg;
+          texture.needsUpdate = true;
+        };
+        primaryImg.onerror = () => {
+          if (!fallbackPath) return;
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => {
+            texture.image = fallbackImg;
+            texture.needsUpdate = true;
+          };
+          fallbackImg.src = fallbackPath;
+        };
+        primaryImg.src = primaryPath;
+
+        return texture;
+      }
+
+      // Initialize graph
+      const Graph = ForceGraph3D()(document.getElementById('3d-graph'))
+        .nodeThreeObject(node => {
+          // Sprites load the 420px thumbnails (~5 MB total) rather than the full-resolution
+          // PNGs (~100 MB); the full images stay available to the blog post's lightbox.
+          const baseDir = node.type === 'real' ? 'images/real-figures' : 'images/figures';
+          const safeName = node.name.includes('/') ? node.name.split('/').pop() : node.name;
+          const thumbName = safeName.replace(/\.png$/i, '.jpg');
+          const primaryPath = `../images/thumbs/${node.type === 'real' ? 'real-figures' : 'figures'}/${thumbName}`;
+          const fallbackPath = `../${baseDir}/${safeName}`;
+
+          const imgTexture = loadTextureWithFallback(primaryPath, fallbackPath);
+          const material = new THREE.SpriteMaterial({ map: imgTexture, depthWrite: false });
+
+          const group = new THREE.Group();
+          const sprite = new THREE.Sprite(material);
+          const size = 30;
+          sprite.scale.set(size, size);
+          group.add(sprite);
+            
+          const glowColor = TYPE_COLORS[node.type] || 0xffffff;
+          const glow = makeGlowSprite(glowColor, size);
+          group.add(glow);
+
+          node.__sprite = sprite;
+          node.__glow = glow;
+          node.__material = material;
+
+          return group;
+        })
+        // .backgroundImageUrl('https://cdn.jsdelivr.net/npm/starry-sky@1.1.2/docs/view.png')
+        .nodeThreeObjectExtend(false)
+        .nodeColor(node => TYPE_COLORS[node.type] || 0xffffff)
+        .onNodeClick(node => {
+          // Aim at node from outside it
+          const distance = 40;
+          const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+          const newPos = node.x || node.y || node.z
+            ? { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }
+            : { x: 0, y: 0, z: distance }; // special case if node is in (0,0,0)
+
+          Graph.cameraPosition(
+            newPos, // new position
+            node, // lookAt ({ x, y, z })
+            3000  // ms transition duration
+          );
+        });
+      
+      // Slow down the initial settling animation
+      Graph.d3VelocityDecay(.8); // more damping, gentler motion
+      Graph.d3AlphaDecay(0.0);   // cool the simulation more slowly
+      Graph.cooldownTime(15000);  // keep forces running longer but at a slower pace
+      Graph.d3Force('charge').strength(-120);
+      
+      const DIM_OPACITY = 0.18;
+      const GLOW_DIM = 0.05;
+      const GLOW_BRIGHT = 0.35;
+      let highlightedType = null;
+
+      const highlightType = (type) => {
+        highlightedType = type;
+        const nodes = Graph.graphData().nodes || [];
+        nodes.forEach(n => {
+          if (!n.__sprite || !n.__glow || !n.__material) return;
+          const isTarget = !type || n.type === type;
+          n.__material.opacity = isTarget ? 1 : DIM_OPACITY;
+          n.__glow.material.opacity = isTarget ? GLOW_BRIGHT : GLOW_DIM;
+        });
+      };
+      
+      
+      // Load data and render
+      fetch('both_figures.json')
+        .then(res => res.json())
+        .then(data => {
+          Graph.graphData(data);
+          Graph.onEngineStop(() => highlightType(highlightedType));
+        });
+
+      window.addEventListener('message', (event) => {
+        if (!event || !event.data || event.data.type !== 'highlightFigureType') return;
+        const incoming = event.data.figureType;
+        const safeType = incoming === null || incoming === 'generated' || incoming === 'real' ? incoming : null;
+        highlightType(safeType);
+      });
+  
+
+    </script>
+  </body>
