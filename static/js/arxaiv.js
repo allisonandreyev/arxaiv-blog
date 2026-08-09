@@ -832,6 +832,24 @@
     });
   }
 
+  // ------------------------------------------------- reading progress
+
+  function initProgress() {
+    var bar = el('div', 'progress');
+    document.body.appendChild(bar);
+    var ticking = false;
+    function update() {
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (h > 0 ? Math.min(100, 100 * window.scrollY / h) : 0) + '%';
+      ticking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
+
   // ------------------------------------------------- boot
 
   function boot() {
@@ -843,6 +861,8 @@
     initBars();
     initPapers();
   }
+
+  initProgress();   // chrome that doesn't depend on the data bundle
 
   fetch('static/data/arxaiv.json')
     .then(function (r) { return r.json(); })

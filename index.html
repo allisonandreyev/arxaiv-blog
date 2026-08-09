@@ -96,9 +96,9 @@
 <section id="quiz-sec">
   <div class="prose">
     <h2><span class="sec-num">01</span>An ambiguous test</h2>
-    <p class="lede">Below are pairs of scientific figures. One in each pair was cropped from a real
-      computer-vision paper. The other was drawn by an image generator that had never seen a
-      dataset, run an experiment, or plotted a number.</p>
+    <p class="lede">Below are pairs of scientific figures. One in each pair was cropped from a <span class="rl">real</span>
+      computer-vision paper. The other was <span class="gen">generated</span> by an image model that
+      had never seen a dataset, run an experiment, or plotted a number.</p>
     <p>One catch: <b>both images start blurred.</b> Sharp, the test is too easy to be interesting,
       because generated figures give themselves away with <em>text</em>. Axis labels dissolve into
       letter-shaped smears, legends repeat themselves, a word comes out almost but not quite
@@ -208,6 +208,8 @@
       vision transformer, and emits <b>512 numbers</b>. Nothing about it was tuned on scientific
       figures, and nobody ever told it which of ours are fake. Its whole training goal was "match
       this image to its caption."</p>
+    <aside class="sidenote"><b>ViT-B-32</b> means a Vision Transformer that cuts a 224×224 image into
+      49 patches of 32×32 pixels. "B" is the base size — about 88M parameters.</aside>
 
     <div class="aside">
       <h4>How to read a distance</h4>
@@ -216,13 +218,19 @@
         (identical direction). Magnitude is thrown away, so a bright figure and a dim one with the
         same content still score high.</p>
       <p>Averaged over every pair within and between the two sets:</p>
-      <p style="font-family:var(--mono);font-size:.86rem;line-height:1.9">
-        generated ↔ generated &nbsp;<b data-n="sim-g2g">0.496</b><br>
-        real ↔ real &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b data-n="sim-r2r">0.485</b><br>
-        generated ↔ real &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b data-n="sim-g2r">0.445</b>
-      </p>
-      <p>Compare the third line to the first two. Generated figures look more like each other than
-        like real work, and — this is the odd part — more like each other than real figures do.
+      <div class="simtable">
+        <div class="simrow"><span><span class="gen">generated</span> ↔ <span class="gen">generated</span></span>
+          <span class="simbar"><i style="width:100%;background:var(--ai)"></i></span>
+          <b data-n="sim-g2g">0.496</b></div>
+        <div class="simrow"><span><span class="rl">real</span> ↔ <span class="rl">real</span></span>
+          <span class="simbar"><i style="width:97.8%;background:var(--real)"></i></span>
+          <b data-n="sim-r2r">0.485</b></div>
+        <div class="simrow"><span><span class="gen">generated</span> ↔ <span class="rl">real</span></span>
+          <span class="simbar"><i style="width:89.7%;background:var(--ink-faint)"></i></span>
+          <b data-n="sim-g2r">0.445</b></div>
+      </div>
+      <p>Compare the third line to the first two. <span class="gen">Generated</span> figures look
+        more like each other than like <span class="rl">real</span> work, and — this is the odd part — more like each other than <span class="rl">real</span> figures do.
         That's what you'd expect from a corpus drawn out of one aesthetic instead of a few hundred
         labs with their own plotting habits.</p>
     </div>
@@ -240,8 +248,8 @@
       corpus varies most and keeps the top few. It's unsupervised — nobody tells PCA which figures
       are generated. All it knows is that the cloud of 269 points is stretched further along some
       axes than others, and it keeps the longest ones.</p>
-    <p>Below is the corpus projected onto the first two of those axes. Colour is the ground truth
-      that PCA never saw. <b>Hover any point to see the figure it stands for; click to open it.</b></p>
+    <p>Below is the corpus projected onto the first two of those axes — <span class="gen">generated</span>
+      against <span class="rl">real</span>. Colour is the ground truth that PCA never saw. <b>Hover any point to see the figure it stands for; click to open it.</b></p>
   </div>
 
   <div class="fig-full needs-data" id="embed-map">
@@ -274,7 +282,7 @@
       neighbours, how many are the same kind as me?</b></p>
     <p>Across all <span data-n="knn-edges">2,147</span> neighbour links,
       <b><span data-n="knn-same">84.9%</span></b> stay within their own population.
-      Generated figures are slightly more clannish than real ones —
+      <span class="gen">Generated</span> figures are slightly more clannish than <span class="rl">real</span> ones —
       <span data-n="knn-gen">87.1%</span> of their neighbours are also generated, against
       <span data-n="knn-real">81.7%</span> for real figures. A model trained only on
       image–caption pairs, given no notion that "AI-generated" is a category, sorts them anyway.</p>
@@ -294,6 +302,9 @@
       layers.</p>
     <p>Fitting that on just PC₁ and PC₂ — the two axes in the map above — and evaluating it
       <em>leave-one-out</em>, so every figure is scored by a line fitted without it:</p>
+    <aside class="sidenote"><b>Leave-one-out</b> refits the model 269 times, each time holding back
+      a different figure and scoring only that one. Nothing is ever tested on data it was fitted
+      on.</aside>
   </div>
 
   <div class="fig-wide needs-data" id="discriminant">
@@ -329,12 +340,14 @@
   <div class="prose">
     <h2><span class="sec-num">06</span>Is it just that fakes look different?</h2>
     <p>Here's the obvious objection, and it deserves a test rather than a paragraph of reassurance.
-      Maybe CLIP isn't detecting anything semantic at all. Maybe generated figures are just
+      Maybe CLIP isn't detecting anything semantic at all. Maybe <span class="gen">generated</span> figures are just
       blurrier, or more colourful, or more crowded, and any dumb pixel statistic would do the same
       job.</p>
     <p>So I computed seven cheap appearance statistics over the same 269 images — edge density, ink
       coverage, colourfulness, mean saturation, tonal entropy, white space, aspect ratio — and
       asked each one, on its own, to separate the corpus.</p>
+    <aside class="sidenote"><b>AUC</b> is the chance that a randomly picked real figure scores above
+      a randomly picked generated one. 0.5 is a coin flip; 1.0 is perfect separation.</aside>
   </div>
 
   <div class="fig-wide needs-data">
@@ -347,8 +360,8 @@
   </div>
 
   <div class="prose">
-    <p>Essentially nothing. Real figures have marginally busier edges and a bit more colour, and
-      generated figures fill a bit more of the page with ink, but every one of those differences is
+    <p>Essentially nothing. <span class="rl">Real</span> figures have marginally busier edges and a
+      bit more colour, and <span class="gen">generated</span> ones fill a bit more of the page with ink, but every one of those differences is
       small enough to drown in the variation <em>within</em> each group. Throw all seven into a
       classifier together and you get <b data-n="pixel-acc">63.9%</b>, six points above guessing.</p>
   </div>
@@ -501,6 +514,8 @@
     <p>I checked every affiliation on all hundred pages by hand and sorted them into three kinds:
       <b>hallucinated</b> (the institution doesn't exist), <b>mutated</b> (a real institution
       wearing a wrong name — <i>University of Adelaid</i>, <i>Sun Yat Tsen</i>), and real.</p>
+    <aside class="sidenote">Every one of the 317 was checked by hand. There is no automated way to
+      tell a misspelt real lab from a plausible invented one.</aside>
   </div>
 
   <div class="fig-wide needs-data">
