@@ -1,8 +1,5 @@
 # arxAIv — 100 Papers That Were Never Written
 
-An explorable explanation submitted to **VISxAI 2026** (9th Workshop on Visualization for AI
-Explainability, IEEE VIS, Boston).
-
 100 computer-vision paper pages were *drawn*, not written, by text-to-image and multimodal models
 from a single prompt. The site uses them to work out what a CLIP embedding actually encodes about
 a synthetic scientific figure, and to show that the signal isn't reducible to how the images look.
