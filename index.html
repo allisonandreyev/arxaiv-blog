@@ -67,7 +67,7 @@
       prominent AI research institutions, cites plausible journals and conferences, and maintains proper subsection order and visual format.</p>
 
     <p>For now, humans can easily discern these figures from real ones, but the post explores how a CLIP embedding model,
-      PCA, and a linear discriminant classify them mathematically with 87% accuracy.</p>
+      PCA, and a linear discriminant classify them mathematically with 87% accuracy. <em>This analysis applies one embedding space (OpenCLIP ViT-B-32) to 269 figures: 156 generated and 113 hand-selected real ones. The findings are specific to this corpus and encoder; generalization beyond it is an open question.</em></p>
   </div>
 
   <div class="fig-full hero-block">
@@ -944,6 +944,7 @@
       <li><b>Section 7 diagnostics ran only on the generated half.</b> They describe synthetic failure, not how real figures respond to the same thresholds.</li>
       <li><b>This corpus is <em>images</em> of papers, not text.</b> A system producing LaTeX or plain text is a different structure worth exploring.</li>
     </ul>
+    <p><b>NOTE:</b> This analysis uses OpenCLIP ViT-B-32 on 269 figures (156 generated, 113 hand-selected real). The separation observed here may not generalize to other embeddings, other generative models, other real-paper sources, or other domains entirely. Testing whether these findings hold across embedding spaces or image sources is essential before drawing broader conclusions.</p>
     <h3>Future Work</h3>
     <ol class="steps">
       <li><b>Control for resolution.</b> <em>Restriction:</em> the two
