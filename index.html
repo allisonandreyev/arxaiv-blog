@@ -61,18 +61,13 @@
 <section id="hero">
   <div class="prose">
     <p class="lede">
-      With the growth in AI capabilities and AI's increasing role as a research assistant, it is apparent that AI
-      has a ever-expanding influence within academia. However, with this influence comes the risk of fully AI-generated content
-      being misrepresented as genuine research. This post serves as a cautionary tale, highlighting the importance of
-      critical evaluation and verification of research outputs, especially in an era where AI can produce convincing 
-      yet entirely fabricated scientific artifacts. As such, arxAIv asks, <em>What if AI generates the entire paper? What would
-      an entirely generated research corpus look like?</em> 
+      As AI capabilities grow, so does the risk of fully AI-generated content being misrepresented as genuine research. This post serves as a cautionary tale, highlighting critical evaluation and verification of research outputs in an era where AI can produce convincing fabricated scientific artifacts. arxAIv asks, <em>What if AI generates the entire paper? What would an entirely generated research corpus look like?</em> 
       While a large majority of the corpus resembles hallucinates &mdash; 31.5% of authors came from non-existent institutions &mdash; 
       the collection nevertheless spreads across subtopics of computer vision in similar proportion to that in the field, names
       prominent AI research institutions, cites plausible journals and conferences, and maintains proper subsection order and visual format.</p>
 
-    <p>While now, it is quite simple for a human to discern between these figures and real ones, the post explores how a CLIP embedding model, 
-      PCA, and a linear discriminant can be used to classify these images mathematially with 87% accuracy.</p>
+    <p>For now, humans can easily discern these figures from real ones, but the post explores how a CLIP embedding model,
+      PCA, and a linear discriminant classify them mathematically with 87% accuracy.</p>
   </div>
 
   <div class="fig-full hero-block">
@@ -139,8 +134,7 @@
 <section id="corpus">
   <div class="prose">
     <h2><span class="sec-num">02</span>Corpus Background</h2>
-    <p>The usual worry about AI and publishing is whether a language model contributed
-      to drafting a paper's textual content. This corpus is about a more extremee case: if nothing was <em>written</em> at all.</p>
+    <p>The usual worry is whether a language model drafted a paper's text. This corpus explores the extreme case: if nothing was <em>written</em> at all.</p>
     <p>Every page in <em class="term">arxAIv</em> is an image. A single prompt —
       <em>"generate a CVPR conference paper; the page should include methodology, experimentation,
       and scientific figures"</em> — was run through a spread of text-to-image and multimodal
@@ -164,11 +158,11 @@
       <div class="strip">
         <figure>
           <img src="static/images/Paper2.png" alt="A generated CVPR-style paper page" loading="lazy">
-          <figcaption>Structure and layour remain largely reliable.</figcaption>
+          <figcaption>Structure and layout remain largely reliable.</figcaption>
         </figure>
         <figure>
           <img src="static/images/Paper5.png" alt="A generated paper page with malformed text" loading="lazy">
-          <figcaption>Malinformed text and hallucinations appear upon closer read.</figcaption>
+          <figcaption>Malformed text and hallucinations appear upon closer inspection.</figcaption>
         </figure>
         <figure>
           <img src="static/images/Paper9.png" alt="A generated paper page with a fabricated figure" loading="lazy">
@@ -297,30 +291,25 @@
 
   <div class="prose">
     <ol class="steps">
-      <li><b>Resize.</b> The shorter side goes to 224 pixels and the center 224×224 is cropped out.
-        This is a lossy, non-optional preprocessing step, and it is the only place the figure's
-        real resolution has any effect at all.</li>
-      <li><b>Patchify.</b> The square is cut into a 7×7 grid of 32-pixel tiles &mdash; 49 of them,
-        the "32" in ViT-B-32. Each tile is flattened into 32×32×3 = 3,072 raw numbers and multiplied
-        by one learned matrix down to a 768-number <em class="term">token</em>. A learned position
-        vector is added so the model knows which cell the tile came from.</li>
+      <li><b>Resize.</b> The shorter side goes to 224 pixels, then the center 224×224 is cropped out.
+        This lossy step is the only place the figure's real resolution matters.</li>
+      <li><b>Patchify.</b> The square is cut into a 7×7 grid of 32-pixel tiles &mdash; 49 total.
+        Each flattens to 3,072 numbers, multiplied by a learned matrix down to a 768-number <em class="term">token</em>.
+        A position vector is added so the model knows which cell it came from.</li>
       <li><b>Attend.</b> A 50th token, <code>CLS</code>, is prepended. Twelve
         transformer layers then let every token read every other token. This is the step that makes
         the output about broader <em>relationships</em> within the image rather than local texture.</li>
-      <li><b>Project.</b> The <code>CLS</code> token after the last layer &mdash; 768 numbers that
-        have absorbed information from all 49 tiles &mdash; is multiplied by a final learned matrix
-        down to <b>512</b>.</li>
+      <li><b>Project.</b> The <code>CLS</code> token &mdash; 768 numbers holding information from all 49 tiles &mdash;
+        is multiplied by a final matrix down to <b>512</b>.</li>
       <li><b>Normalize.</b> Divide by its own length. Every figure is now a point on the unit sphere
-        in 512 dimensions, so only <em>direction</em> carries information and overall magnitude is dicarded. 
+        in 512 dimensions, so only <em>direction</em> carries information and overall magnitude is discarded. 
         That is why the comparison below is an angle rather than a distance.</li>
     </ol>
 
     <div class="aside">
       <h4>Embedding Similarity</h4>
-      <p>Two embeddings are compared by <em>cosine similarity</em>: the cosine of the angle between
-        the two 512-dimensional vectors. It runs from −1 (opposite) through 0 (unrelated) to 1
-        (identical direction). Since magnitude is discarded, a bright figure and a dim one with the
-        same content will still score high.</p>
+      <p><em>Cosine similarity</em> measures the angle between 512-dimensional vectors: −1 (opposite) to 1 (identical).
+        Since magnitude is discarded, bright and dim figures with the same content score identically.</p>
       <p>Cosine Similarities (Averaged over every pair between the two sets):</p>
       <div class="simtable">
         <div class="simrow"><span><span class="gen">generated</span> ↔ <span class="gen">generated</span></span>
@@ -341,8 +330,7 @@
 <section id="map">
   <div class="prose">
     <h2><span class="sec-num">04</span>Principal Component Analysis (PCA)</h2>
-    <p><em class="term">Principal component analysis</em> finds the directions along which the
-      corpus varies most and keeps the top few.
+    <p><em class="term">Principal component analysis</em> finds the directions with the most variance and keeps the top few.
     <p>Concretely, PCA works in three steps. First <em>standardize</em>: each of the 512 coordinates is
       shifted to mean zero and divided by its own spread across the corpus, so no coordinate
       dominates the geometry just by happening to have a wider range. Then <em>search</em>: find the
@@ -355,16 +343,11 @@
 
     <div class="aside">
       <h4>Capturing the Corpus</h4>
-      <p>PC₁ accounts for <b><span data-n="evr1">6.1%</span></b> of the total variance in the
-        standardized embeddings. PC₂ adds <b><span data-n="evr2">5.5%</span></b>. Together, the two
-        axes of the map carry <b><span data-n="evr12">11.6%</span></b> of what
-        varies across this corpus. Adding PC₃ — the depth axis in the 3D map at the top of this post
-        — brings it to <span data-n="evr123">15.7%</span>. The remaining 84% is spread across 509
-        dimensions discarded during PCA.</p>
-      <p><b>However, a direction being long is not the same as a direction being meaningful.</b> PCA
-        ranks directions by spread alone, and spread has no relationship to the real/generated
-        distinction. Had the class difference happened to lie in a low-variance direction, these 2
-        axes wouldn't be able to capture it.</p>
+      <p>PC₁ accounts for <b><span data-n="evr1">6.1%</span></b> of variance, PC₂ adds <b><span data-n="evr2">5.5%</span></b>.
+        Together they carry <b><span data-n="evr12">11.6%</span></b>; adding PC₃ brings it to <span data-n="evr123">15.7%</span>.
+        The remaining 84% spreads across 509 discarded dimensions.</p>
+      <p><b>But longest ≠ meaningful.</b> PCA ranks by spread alone, which doesn't relate to real/generated distinction.
+        If the class difference lay in a low-variance direction, these axes wouldn't capture it.</p>
     </div>
     <p>Below is the corpus projected onto the first two of those axes — <span class="gen">generated</span>
       against <span class="rl">real</span>. Color is the ground truth.</p>
@@ -455,21 +438,19 @@
       <span data-n="lda-miss">35</span> of <span data-n="total-figs">269</span> figures fall on the
       wrong side — <b><span data-n="lda-acc">87.0%</span></b> correct, against
       <span data-n="lda-base">58.0%</span> for a classifier that always guesses the majority class.
-      The misclasified dots present some key observations; real figures that read as synthetic
-      tend to be sparse schematics. Meanwhile, enerated figures that read as real tend to be dense scatter
-      plots.</figcaption>
+      Misclassified figures reveal patterns: real ones that read as synthetic tend to be sparse schematics,
+      while generated ones that read as real tend to be dense scatter plots.</figcaption>
   </div>
 
   <div class="prose">
     <h3>Validity of Result</h3>
-    <p>Since 269 points in two dimensions is not many; a flexible enough procedure will find <em>something</em> in
-      anything; the robustness of this experiment can be evaluated by determining if the same procedure
-      scores highly when there is nothing to find.</p>
+    <p>With only 269 points in two dimensions, a flexible procedure can find signal in noise.
+      To evaluate robustness, I test whether the same procedure scores highly when there is nothing to find.</p>
     <p>A <em class="term">permutation test</em> answers exactly that, and it is the cheapest
       safeguard in statistics because it needs no assumptions about the data at all. Shuffle the
-      real/generated labels at random, so that by construction the two classes are interchangeabl. 
+      real/generated labels at random, so that by construction the two classes are interchangeable. 
       Refit the entire leave-one-out loop on the shuffled labels and record the accuracy. Repeating this
-      2,000 times creates an accurate representation of whatthis exact procedure scores on noise.</p>
+      2,000 times creates an accurate representation of what this exact procedure scores on noise.</p>
 
     <div class="aside">
       <h4>Permutation Test</h4>
@@ -570,11 +551,9 @@
       Given that the discriminant works, <em>what part of a figure is it most reliant on?</em></p>
 
     <h3>Image Patch Analysis</h3>
-    <p>Step 2 of the encoder cut every figure into a 7×7 grid of 49 tiles. Take a figure, replace
-      exactly one tile with flat gray, and recalculate result through the frozen pipeline —
-      the same encoder, the same standardizer, the same two principal components, and the same
-      three-number discriminant from section 5. Repeating this process for each of the 49 tiles in 
-      each figure creates a map of which parts of the image are most important for the classification.
+    <p>Step 2 cut each figure into a 7×7 grid of 49 tiles. Replace one tile with flat gray and recalculate
+      through the frozen pipeline (encoder, standardizer, PCA, discriminant). Repeating for each of the 49 tiles
+      creates a map of which parts matter most for classification.
     <h3>The first result is about the method, not the corpus</h3>
     <p><b><span data-occ-n="bias-frac">81%</span></b> of all
       <span data-n="occ-passes">13,181</span> deltas point the same way: hiding a tile — any tile,
@@ -588,9 +567,8 @@
       almost exactly evenly.</p>
     <aside class="sidenote">Any saliency method that perturbs an input has some version of this problem;
       the only way to see it is to look at the distribution of the raw effect before interpreting any single one of them.</aside>
-    <p>So: a tile shaded <span class="rl">orange</span> is one the decision relied on
-      <em>more</em> than this figure's average, in the direction of "generated." A
-      <span class="gen">blue</span> tile relied toward "real." Pale tiles are ones nearly irrelevant to the classifier.</p>
+    <p>A tile shaded <span class="rl">orange</span> was relied on more than this figure's average, toward "generated."
+      A <span class="gen">blue</span> tile leans toward "real." Pale tiles are nearly irrelevant.</p>
   </div>
 
   <div class="fig-full needs-data" id="occlusion">
@@ -606,19 +584,13 @@
       </div>
       <div class="occ-stage"></div>
     </div>
-    <figcaption style="margin:.8rem auto 0;max-width:52rem">Notably, the five most influential tiles out of 49 account for a median
-      <b><span data-occ-n="top5">26%</span></b> of a figure's total movement, against the 10% they
-      would hold if influence were spread perfectly evenly — concentrated, but only about 2.5×. And
-      for <b><span data-occ-n="noflip">87%</span></b> of figures, no single tile could have been
-      hidden to change the verdict.</figcaption>
+    <figcaption style="margin:.8rem auto 0;max-width:52rem">The five most influential tiles account for a median
+      <b><span data-occ-n="top5">26%</span></b> of movement (vs. 10% if evenly spread—about 2.5× concentrated).
+      For <b><span data-occ-n="noflip">87%</span></b> of figures, no single tile flips the verdict.</figcaption>
   </div>
 
   <div class="prose">
-    <p> Another important nuance is the effect of text on classification: it is possible the garbeled text or
-      mispellings in the figures have a disprorportionate effect on the classification, rather than the 
-      graphic structure of the image itself. To evaluate this, I ran OCR over each figure at full resolution, pushing the
-      word boxes through the same resize-and-crop geometry, covering every tile a word touches, and comparing influence on text tiles against
-      influence on the rest.</p>
+    <p>Text may have a disproportionate effect on classification over graphic structure. To evaluate this, I ran OCR over each figure at full resolution, mapped word boxes through the resize-and-crop geometry, and compared text-tile influence against the rest.</p>
 
     <div class="aside">
       <h4>Text Tile Weight Analysis</h4>
@@ -631,8 +603,7 @@
         the gap is <b><span data-occ-n="real-diff">+0.019</span></b>, CI
         <span data-occ-n="real-ci">[+0.008, +0.032]</span>, ahead in
         <span data-occ-n="real-frac">64%</span> of figures.</p>
-      <p>So, text tiles carry roughly <b>10 to 17% more</b> weight than non-text tiles, not several times more. 
-        As such, printed text is a contributor to the classification but nowhere near the whole of it.</p>
+      <p>Text tiles carry roughly <b>10 to 17% more</b> weight than non-text ones—a contributor but not the mechanism.</p>
       <p>Notably, OCR finds usable text in
         <span data-occ-n="ocr-gen">76%</span> of generated figures against
         <span data-occ-n="ocr-real">86%</span> of real ones, and marks a mean of
@@ -641,12 +612,8 @@
     </div>
 
     <h3>No-Text Ablation</h3>
-    <p>Everything above is a statement about textual influence <em>within</em> an image. 
-      But it cannot answer the question underneath, which is how the discrminant would perform without text.</p>
-    <p> <b>Blanking anything at all would affect the embedding.</b>
-      So the run includes a control: the <em>same number of boxes, at the same sizes</em> with
-      randomized positions on the same figure. Without it, the cost of losing pixels could be misinterpreted
-      as the cost of losing text.</p>
+    <p>The above measures text influence <em>within</em> an image but cannot answer how the discriminant performs without text.</p>
+    <p>Blanking anything affects the embedding, so the run includes a control: random boxes at the same sizes and positions. Without it, the cost of losing pixels could be misinterpreted as the cost of losing text.</p>
   </div>
 
   <div class="fig-wide needs-data" id="mask-ablation">
@@ -673,10 +640,9 @@
         the majority baseline, removing the text costs about
         <b><span data-n="mask-share">25%</span></b> of the signal.</p>
       <p>As such, printed text is a real, measurable contributor &mdash; but it is not the mechanism.</p>
-      <p>One caveat that cannot be measured away: OCR cannot find the most degraded text, so "every detectable word" is not "every word."
-        The masking is also slightly uneven &mdash; it blanks
-        <span data-n="mask-area-gen">4.6%</span> of a generated figure against
-        <span data-n="mask-area-real">5.1%</span> of a real one.</p>
+      <p>One caveat: OCR cannot find the most degraded text, so "every detectable word" is not "every word."
+        Masking is also slightly uneven—<span data-n="mask-area-gen">4.6%</span> of generated vs.
+        <span data-n="mask-area-real">5.1%</span> of real figures.</p>
     </div>
   </div>
 </section>
@@ -687,11 +653,8 @@
 <section id="inside">
   <div class="prose">
     <h2><span class="sec-num">07</span>Pearson Correlation</h2>
-    <p class="lede">Inside the generated half: CLIP identifies the two populations differ, but not
-      <em>how</em> a fake figure fails. Identifying this means inventing new measurements and
-      then asking whether they agree with each other &mdash; correlation.</p>
-    <p><b>The technique this section is about is Pearson correlation.</b> Four hand-built
-      diagnostics over the <span data-n="gen-figs">156</span> generated figures are the example:</p>
+    <p class="lede">CLIP identifies the populations differ, but not how fake figures fail. Finding this means inventing measurements and checking if they correlate.</p>
+    <p>Four hand-built diagnostics over the <span data-n="gen-figs">156</span> generated figures illustrate <em>Pearson correlation</em>:</p>
     <ul class="tight">
       <li><b>CLIP caption agreement</b> — cosine similarity between the figure and the caption
         printed beneath it. Low means the picture and its own caption are about different things.</li>
@@ -716,18 +679,13 @@
         low means the figure and the caption printed beneath it are <em>misaligned</em>.</p>
     </div>
 
-    <p>Pick any two and look for structure. Hover a point to see the figure behind it. Each pairing
-      reports a <em class="term">Pearson r</em>, with a meter underneath showing where that coefficient falls
-      against the range this corpus produces by chance. </p>
-    <aside class="sidenote"><b>Pearson r</b> measures how tightly two metrics track one straight
-      line. <span class="mono">0</span> means knowing one tells you nothing about the other;
-      <span class="mono">+1</span> and <span class="mono">&minus;1</span> are perfect straight-line
-      agreement and disagreement. Squaring it gives <b>r&sup2;</b>, the share of the variation in one
-      metric the other accounts for &mdash; so <span class="mono">r = 0.3</span> is
-      <span class="mono">r&sup2; = 0.09</span>, or nine percent. 
-      Importantly, r sees only <em>straight</em> lines, so a strong curved relationship can score near zero; and with 156
-      points, coefficients below about <span class="mono">|r| = 0.16</span> turn up routinely when
-      there is no linear relationship at all.</aside>
+    <p>Pick any two and hover to see the figure. Each pairing reports <em class="term">Pearson r</em>
+      with a meter showing where it falls against chance.</p>
+    <aside class="sidenote"><b>Pearson r</b> measures how tightly two metrics track a straight line.
+      <span class="mono">0</span> means no relationship; <span class="mono">±1</span> means perfect agreement or disagreement.
+      Squaring it gives <b>r²</b>, the share one metric accounts for—so <span class="mono">r = 0.3</span> means
+      <span class="mono">r² = 0.09</span> (9%). r only sees straight lines, so curved relationships score near zero.
+      With 156 points, <span class="mono">|r| < 0.16</span> routinely appears by chance alone.</aside>
   </div>
 
   <div class="fig-wide needs-data" id="metric-explorer">
@@ -748,15 +706,11 @@
   <div class="prose">
     <div class="aside transfers">
       <h4>Implications</h4>
-      <p>Nothing above is specific to synthetic figures; this analysis can be run on any dataset with two continuous variables. 
-        In order to address 2 most common failure modes, it is important to follow these guidelines:
-        <b>First: compute the noise floor before reading the
-        coefficient.</b> At <span class="mono">n</span> points, <span class="mono">|r|</span> below
-        roughly <span class="mono">2/&radic;n</span> can frequently occur with no relationship at
-        all.
-        <b>Second: count how many pairings were used.</b> Every panel flipped past is a test,
-        and the chance of a spurious hit grows with the number of them; dividing tolerance by
-        that count is the simplest available fix.</p>
+      <p>This analysis works on any dataset with two continuous variables. Two rules avoid common failure modes:
+        <b>First: compute the noise floor.</b> At <span class="mono">n</span> points, <span class="mono">|r|</span> below
+        roughly <span class="mono">2/√n</span> occurs by chance.
+        <b>Second: count pairings.</b> Every comparison is a test; spurious hits grow with count.
+        Divide tolerance by the number of tests.</p>
     </div>
   </div>
 
@@ -768,7 +722,7 @@
         tokens or fewer. On six of them <b>OCR recovers nothing at all</b>.</p>
       <p>Worse, a figure whose text has dissolved completely does not
         score a high gibberish ratio; it scores <em>no</em> ratio, because OCR cannot identify
-        the tangles as text. As such,a low gibberish ratio should be interpreted as "OCR found a
+        the tangles as text. As such, a low gibberish ratio should be interpreted as "OCR found a
         few legible tokens," rather than "the text is fine."</p>
     </div>
     <p>So a figure can be structurally intricate and completely illegible. It can be perfectly
@@ -782,36 +736,27 @@
 <section id="text">
   <div class="prose">
     <h2><span class="sec-num">08</span>OCR</h2>
-    <p>Because these pages are pictures, their text has no ground truth. It has to be OCR'd back
-      out, which can call for its own independent analysis.</p>
-    <p>However, OCR on a rendered-then-degraded page is often damaged enough
-      that no transcriber recovers words from the image at all. As such, an 
-      LLM mapped each raw OCR extraction to its nearest sensible reading</b>, e.g resolving <span class="mono">acrial
-      imegery</span> to <i>aerial imagery</i> and so on down the page.</p>
+    <p>Since these pages are pictures, their text has no ground truth—it must be OCR'd back out.</p>
+    <p>OCR on rendered-then-degraded pages is often too damaged to read. An LLM mapped each raw extraction to its nearest sensible reading—for instance, <span class="mono">acrial imegery</span> to <i>aerial imagery</i>.</p>
     <p>The titles serve as the control: they come from a separate column that never went through the correction pass. That is why
       paper 1 is still titled "A scalable object detection framework for <span class="mono">acrial
       imegery</span>" while its own abstract, corrected, opens on "Aerial imagery."</p>
 
     <div class="aside caution">
       <h4>LLM Pass Analysis</h4>
-      <p>Score both versions of each page by the share of their word tokens that appear in a system
-        dictionary. The raw OCR averages <b><span data-n="ocr-raw-rate">49%</span></b> — fewer than
-        half the words it reads off these pages are words — against
-        <b><span data-n="ocr-corr-rate">76%</span></b> for the corrected excerpts.
-        Mean OCR confidence across the corpus is <span data-n="ocr-conf">74</span> out of 100, over
-        an average of <span data-n="ocr-tokens">428</span> tokens a page.</p>
-      <p>Notably, rescoring the raw text from the word "Abstract" onwards gives <b><span data-n="ocr-body-rate">48%</span></b> — the gap does not
-        shrink, it widens slightly, to <span data-n="ocr-body-gap">28</span> points. So the gap is not just in the paper's metadata, but persists throughout.</p>
+      <p>Score both by dictionary-word share: raw OCR averages <b><span data-n="ocr-raw-rate">49%</span></b>,
+        corrected excerpts <b><span data-n="ocr-corr-rate">76%</span></b>. Mean OCR confidence is
+        <span data-n="ocr-conf">74</span>/100 over <span data-n="ocr-tokens">428</span> tokens per page.</p>
+      <p>Rescoring from "Abstract" onwards gives <b><span data-n="ocr-body-rate">48%</span></b>—the gap widens to
+        <span data-n="ocr-body-gap">28</span> points, showing the problem persists throughout the text.</p>
    </p>
     </div>
     <div class="aside">
       <h4>OCR Limitation</h4>
-      <p>Importantly, a figure whose text has been destroyed and a figure with no text in it produce byte-identical output, and any
-        quantity computed as a fraction of detected tokens is undefined.</p>
+      <p>A figure with destroyed text and one with no text produce identical output, so any fraction of detected tokens is undefined.</p>
     </div>
 
-    <p>Structurally, <b>69%</b> of the hundred pages are complete. The rest are missing a section
-      outright; <span data-n="notitle">21</span> pages never render a title.</p>
+    <p><b>69%</b> of pages are structurally complete; the rest miss sections. <span data-n="notitle">21</span> pages never render a title.</p>
   </div>
 
   <div class="fig-wide needs-data">
@@ -842,9 +787,7 @@
   </div>
 
   <div class="prose">
-    <p>It can be seen that the reference lists cite real-sounding authors in real-sounding
-      venues, and where a citation does land near a paper that exists, it lands near an
-      <em>obvious</em> one — such as the most-cited work in that subfield, reworded.</p>
+    <p>The reference lists cite real-sounding authors and venues. When citations land near real papers, they target obvious ones—the most-cited works in each subfield, reworded.</p>
   </div>
 </section>
 
@@ -854,9 +797,9 @@
 <section id="people">
   <div class="prose">
     <h2><span class="sec-num">09</span>Metadata Analysis</h2>
-    <p>I checked every affiliation on all 100 pages by hand and sorted them into three kinds:
-      <b>hallucinated</b> (the institution doesn't exist), <b>mutated</b> (a real institution
-      wearing a wrong name — <i>University of Adelaid</i>, <i>Sun Yat Tsen</i>), and real.</p>
+    <p>I checked every affiliation by hand and sorted them into three kinds: <b>hallucinated</b>
+      (institution doesn't exist), <b>mutated</b> (real institution with wrong name—<i>University of Adelaid</i>,
+      <i>Sun Yat Tsen</i>), and real.</p>
   </div>
 
   <div class="fig-wide needs-data">
@@ -879,8 +822,7 @@
   </div>
 
   <div class="prose">
-    <p>The names collapse toward the mode in the same way. Across
-      <span data-n="authors">340</span> invented authors, a few surnames are much more common than the rest.</p>
+    <p>Surnames collapse toward a few common ones. Across <span data-n="authors">340</span> invented authors, this concentration is notable.</p>
   </div>
 
   <div class="fig-wide needs-data">
@@ -911,10 +853,8 @@
 
     <div class="aside transfers">
       <h4>Implications</h4>
-      <p>Concentration statistics are easy to compute and easy to misuse, because every one of
-        them is <b>sample-size dependent</b> &mdash; entropy in particular rises with
-        <span class="mono">n</span> almost mechanically. Two corpora of different sizes cannot be
-        compared on these numbers directly: subsample to a common size first, or compare nothing.</p>
+      <p>Concentration statistics are easy to misuse because every one is <b>sample-size dependent</b>—entropy rises with
+        <span class="mono">n</span> mechanically. Different-sized corpora cannot be compared directly; subsample to a common size first.</p>
     </div>
   </div>
 </section>
@@ -925,12 +865,10 @@
 <section id="field">
   <div class="prose">
     <h2><span class="sec-num">10</span>Topic clusters</h2>
-    <p><b>The technique is cluster validity: modularity, which asks whether a grouping is really
-      there in the data, and the adjusted Rand index, which asks whether two groupings agree.</b>
-      Both take any graph and any partition.</p>
-    <p>Every page was read and filed under one of five computer-vision subtopics by hand.
-      Tallied up, the hundred papers land in proportions that look like a
-      plausible portion of the field: segmentation the largest, generation the smallest, detection and
+    <p><b>This section uses modularity</b> (does a grouping really exist in the data?) <b>and adjusted Rand index</b>
+      (do two groupings agree?).</p>
+    <p>I read and filed each page under one of five computer-vision subtopics. The hundred papers
+      distribute like a plausible field sample: segmentation largest, generation smallest, detection and
       features close behind.</p>
     <p>Separately, the hundred titles were embedded with <code>all-MiniLM-L6-v2</code> — a sentence
       transformer — and each linked to its nearest neighbors to make the graph further
@@ -962,16 +900,12 @@
 
     <div class="aside transfers">
       <h4>Implications</h4>
-      <p>Coloring a layout by a pre-existing label proves nothing on its own, because the
-        layout was computed without ever seeing the label &mdash; and a force-directed graph will
-        look structured whether or not any structure is there.</p>
-      <p>Two cheap checks separate a real finding: <b>Modularity</b> asks whether your grouping is actually in the data: how
-        much more edge weight falls inside groups than random rewiring would give, where 0 is chance
-        and above about 0.3 suggests real community structure. <b>Adjusted Rand index</b> asks
-        whether two groupings agree, corrected for the agreement you would get by luck. Run your
-        labels against what an unsupervised method finds on the same graph. If the label modularity
-        is far below what clustering achieves, and the ARI is near zero, then what you are looking
-        at is your own annotation, drawn on top of structure that is about something else.</p>
+      <p>Coloring a layout by a label proves nothing—the layout was computed without seeing it, and
+        force-directed graphs look structured whether or not any structure exists.</p>
+      <p>Two checks separate real findings: <b>Modularity</b>—how much more edge weight falls inside groups
+        than random rewiring would give (0 = chance, >0.3 suggests real structure). <b>Adjusted Rand index</b>—
+        whether two groupings agree, corrected for luck. If label modularity is far below what clustering achieves
+        and ARI is near zero, the annotation is on unrelated structure.</p>
     </div>
   </div>
 
@@ -993,7 +927,7 @@
   <div class="prose">
     <h2><span class="sec-num">11</span>Implications and Limitations</h2>
 
-    <h3>Implications and Future Work</h3>
+    <h3>Limitations</h3>
     <ul class="tight">
       <li><b>The two populations differ in resolution.</b> The median <span class="gen">generated</span> figure is
         <span data-n="gen-w">483</span> pixels wide; the median <span class="rl">real</span> one is
@@ -1007,11 +941,8 @@
         into the encoder and the <span class="gen">generated</span> ones only <b>1.2&times;</b>, so
         the real half arrives smoother and the generated half arrives with more high-frequency
         detail intact. </li>
-      <li><b>The diagnostics in section 7 were only ran on the generated half.</b> They describe how
-        synthetic figures fail. They say nothing about how often real ones would respond to the same
-        thresholds, and several probably would.</li>
-      <li><b>This corpus is <em>images</em> of papers, not text.</b> The pages were drawn, so a system
-        emitting LaTeX or plain text is a different structure I propose as a future direction.</li>
+      <li><b>Section 7 diagnostics ran only on the generated half.</b> They describe synthetic failure, not how real figures respond to the same thresholds.</li>
+      <li><b>This corpus is <em>images</em> of papers, not text.</b> A system producing LaTeX or plain text is a different structure worth exploring.</li>
     </ul>
     <h3>Future Work</h3>
     <ol class="steps">
@@ -1042,20 +973,15 @@
   <div class="prose">
     <h3>Data &amp; Reproduction</h3>
     <p>Figure embeddings: <code>OpenCLIP ViT-B-32</code> / <code>laion2b_s34b_b79k</code>,
-      L2-normalized, standardized, reduced with PCA, joined into a <i>k</i>=8 cosine nearest-neighbor
-      graph. Title embeddings: <code>all-MiniLM-L6-v2</code>. Classifiers are leave-one-out linear
-      discriminant analysis. Page text is OCR followed by an LLM pass that resolves garbled runs to
-      their nearest sensible reading, so quoted excerpts are corrected rather than raw (section 8).
-      Affiliation and reference audits are manual. Everything the page draws
-      lives in <code>static/data/arxaiv.json</code>; the notebook that produced the embeddings ships
-      with the dataset release as <code>tools/colab_embeddings_and_graph_data_generation.py</code>.</p>
-    <p>The section 6 occlusion maps are <code>tools/occlusion.py</code>, which re-embeds the 269
-      figures in <code>static/images/</code>, refits the standardizer, the PCA and the discriminant,
-      aligns component signs against the shipped map, and then hides each of the 49 input tiles in
-      turn. Refitting from the images in this repository alone recovers the published coordinates at
-      r &gt; 0.999 on all three components, so the map can be rebuilt without the source archive.
-      The PCA variance shares in section 4 and the image-dimension figures in section 11 are derived
-      in <code>tools/build_data.py</code>.</p>
+      L2-normalized, standardized, PCA-reduced, k=8 nearest-neighbor graph. Title embeddings:
+      <code>all-MiniLM-L6-v2</code>. Classifiers use leave-one-out linear discriminant analysis.
+      Page text is OCR plus LLM correction (section 8), so excerpts are corrected not raw.
+      Affiliation and reference audits are manual. All page data lives in <code>static/data/arxaiv.json</code>;
+      the embedding notebook ships as <code>tools/colab_embeddings_and_graph_data_generation.py</code>.</p>
+    <p>Section 6 occlusion maps use <code>tools/occlusion.py</code>: re-embeds 269 figures, refits standardizer/PCA/discriminant,
+      aligns against the shipped map, then hides each of 49 tiles. Refitting from repository images alone
+      recovers published coordinates at r > 0.999, so the map rebuilds without the source archive.
+      PCA variance (section 4) and image-dimension figures (section 11) derive from <code>tools/build_data.py</code>.</p>
     <p><a href="https://github.com/allisonandreyev/arxAIv">Code</a> ·
       <a href="https://github.com/allisonandreyev/arxaiv.github.io/releases/tag/v0.5">Dataset</a> ·
       <a href="https://youtu.be/EyoskUy2ZXo">Video</a> ·
