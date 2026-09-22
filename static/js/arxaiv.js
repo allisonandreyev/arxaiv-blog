@@ -29,6 +29,31 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
   function fmt(v, p) { return Number(v).toFixed(p == null ? 2 : p); }
+  function group(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  /* Normal quantile (Acklam's rational approximation, |error| < 1.2e-9). Needed to turn a
+     multiple-comparison-corrected alpha into a critical |r|, so the noise band the explorer
+     draws stays correct if the metric list ever changes length. */
+  function zQuantile(p) {
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+             1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+             6.680131188771972e+01, -1.328068155288572e+01];
+    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+             -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+             3.754408661907416e+00];
+    var pl = 0.02425, q, r;
+    if (p < pl) {
+      q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+             ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+    if (p > 1 - pl) return -zQuantile(1 - p);
+    q = p - 0.5; r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+           (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
 
   function figSrc(f, full) {
     var base = (full ? FULL : THUMB)[f.c === 1 ? 'ai' : 'real'];
@@ -162,23 +187,57 @@
 
   // ---------------------------------------------------------------- lightbox
 
-  var lightbox;
-  function openLightbox(src, alt) {
+  /* Third argument is optional: { rel, raw, base, ramp, G } from an occlusion row. When
+     present, the lightbox crops to the same square the encoder sees (object-fit: cover on
+     a 1:1 frame, exactly like .occ-frame) and overlays the same 7x7 patch grid, scaled up,
+     instead of dropping it -- so a click zooms the patches in rather than away. */
+  var lightbox, lightboxMedia, lightboxGrid, lightboxTip;
+  function openLightbox(src, alt, patches) {
     if (!lightbox) {
       lightbox = el('div', 'lightbox');
+      lightboxMedia = el('div', 'lightbox-media');
       var img = el('img');
+      lightboxGrid = el('div', 'lightbox-grid');
       var close = el('button', 'lightbox-close', '×');
       close.setAttribute('aria-label', 'Close');
-      lightbox.appendChild(img);
+      lightboxMedia.appendChild(img);
+      lightboxMedia.appendChild(lightboxGrid);
+      lightbox.appendChild(lightboxMedia);
       lightbox.appendChild(close);
       document.body.appendChild(lightbox);
-      lightbox.addEventListener('click', function () { lightbox.classList.remove('open'); });
+      lightboxTip = new Tip(lightboxMedia);
+      lightbox.addEventListener('click', function () {
+        lightbox.classList.remove('open');
+        lightboxTip.hide();
+      });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') lightbox.classList.remove('open');
+        if (e.key === 'Escape') { lightbox.classList.remove('open'); lightboxTip.hide(); }
       });
     }
     var im = $('img', lightbox);
     im.src = src; im.alt = alt || '';
+    lightboxGrid.innerHTML = '';
+    lightboxMedia.classList.toggle('has-grid', !!patches);
+    if (patches) {
+      patches.rel.forEach(function (v, i) {
+        var cell = el('i');
+        var k = patches.ramp(v);
+        cell.style.background = k.fill;
+        cell.style.opacity = k.alpha.toFixed(3);
+        cell.addEventListener('mousemove', function (e) {
+          var b = lightboxMedia.getBoundingClientRect();
+          lightboxTip.show('<span class="tip-k">tile ' + ((i / patches.G | 0) + 1) + ',' +
+            (i % patches.G + 1) + '</span>' + fmt(v, 3) +
+            ' against this figure\'s average tile — hiding it argues <b>' +
+            (v > 0 ? 'generated' : 'real') + '</b>' +
+            '<br><span style="opacity:.65">raw ' + fmt(patches.raw[i], 3) +
+            ', baseline ' + fmt(patches.base, 3) + '</span>',
+            e.clientX - b.left, e.clientY - b.top);
+        });
+        cell.addEventListener('mouseleave', function () { lightboxTip.hide(); });
+        lightboxGrid.appendChild(cell);
+      });
+    }
     lightbox.classList.add('open');
   }
 
@@ -452,7 +511,7 @@
     function draw() {
       surf.clear();
       var ctx = surf.ctx;
-      // grey background halves
+      // gray background halves
       ctx.save();
       ctx.fillStyle = css('--bg-sunken');
       ctx.globalAlpha = 0.75;
@@ -528,19 +587,31 @@
   var METRICS = {
     clip: { key: 'clip', label: 'CLIP caption agreement', hint: 'cosine similarity between the figure and its own caption' },
     cplx: { key: 'cplx', label: 'Structural complexity', hint: 'edge/contour density of the rendered panel' },
-    gib:  { key: 'gib',  label: 'Gibberish ratio', hint: 'share of OCR-recovered tokens that are not words' },
+    gib:  { key: 'gib',  label: 'Gibberish ratio', hint: 'share of raw-OCR tokens that are not words' },
+    tok:  { key: 'tok',  label: 'OCR tokens recovered', hint: 'how many tokens OCR found at all — the gibberish ratio\u2019s denominator' },
     rep:  { key: 'rep',  label: 'Repetition count', hint: 'duplicated glyph runs detected in the panel' }
   };
+  // Distinct unordered pairings the explorer lets you flip through. Drives the
+  // multiple-comparison correction in initMetrics(), so it must stay derived, not typed.
+  var PAIRS = (function (k) { return k * (k - 1) / 2; })(Object.keys(METRICS).length);
 
   function initMetrics() {
     var host = $('#metric-explorer');
     if (!host || !D) return;
     var canvas = $('canvas', host);
     var tip = new Tip($('.chart-holder', host));
-    var pts = D.figures.filter(function (f) { return f.c === 1 && f.clip != null; });
-    var xk = 'gib', yk = 'clip', hover = null, surf;
+    var all = D.figures.filter(function (f) { return f.c === 1 && f.clip != null; });
+    var pts = all, xk = 'tok', yk = 'gib', hover = null, surf;
+
+    // A figure whose OCR recovered nothing has no gibberish ratio — the denominator is zero.
+    // Dropping those six silently would hide the most degraded figures in the corpus, so they
+    // are excluded from the plot only when an axis needs them, and counted out loud below it.
+    function repoint() {
+      pts = all.filter(function (f) { return f[xk] != null && f[yk] != null; });
+    }
 
     function build() {
+      repoint();
       surf = new Surface(canvas, {
         domain: {
           x: extent(pts, function (d) { return d[xk]; }),
@@ -555,6 +626,24 @@
       surf.clear();
       surf.axes(METRICS[xk].label, METRICS[yk].label);
       var ctx = surf.ctx;
+      var fit = lsq(pts.map(function (p) { return p[xk]; }), pts.map(function (p) { return p[yk]; }));
+
+      // Best straight-line fit, drawn first so the points sit on top of it. This is the
+      // line Pearson r is describing — without it, r is a number with nothing to point at.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(surf.m.l, surf.m.t, surf.iw, surf.ih);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.moveTo(surf.sx(surf.dom.x[0]), surf.sy(fit.at(surf.dom.x[0])));
+      ctx.lineTo(surf.sx(surf.dom.x[1]), surf.sy(fit.at(surf.dom.x[1])));
+      ctx.strokeStyle = css('--ink-faint');
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.globalAlpha = 0.85;
+      ctx.stroke();
+      ctx.restore();
+
       pts.forEach(function (p) {
         ctx.beginPath();
         ctx.arc(surf.sx(p[xk]), surf.sy(p[yk]), p === hover ? 6.5 : 4.2, 0, 6.2832);
@@ -566,13 +655,27 @@
         }
       });
       ctx.globalAlpha = 1;
-      // correlation readout
-      var rr = pearson(pts.map(function (p) { return p[xk]; }), pts.map(function (p) { return p[yk]; }));
+
+      // correlation readout + a plain-language reading of it
       var out = $('.metric-r', host);
-      if (out) out.innerHTML = 'Pearson <span class="mono">r = ' + fmt(rr, 2) + '</span> across ' + pts.length + ' generated figures';
+      if (out) {
+        out.innerHTML = 'Pearson <span class="mono">r = ' + fmt(fit.r, 2) + '</span>' +
+          ' · <span class="mono">r&sup2; = ' + fmt(fit.r * fit.r, 2) + '</span>';
+      }
+      drawMeter(fit, pts.length);
+      var gl = $('.metric-gloss', host);
+      if (gl) {
+        var dropped = all.length - pts.length;
+        gl.innerHTML = gloss(fit, pts.length) + (dropped
+          ? ' <b>' + dropped + ' of ' + all.length + ' figures are not plotted here</b>, because OCR ' +
+            'recovered no tokens from them at all and the ratio has no denominator. They are the ' +
+            'most degraded figures in the corpus, and this metric cannot see them.'
+          : '');
+      }
     }
 
-    function pearson(a, b) {
+    // Least-squares fit plus the correlation coefficient, from one pass over the data.
+    function lsq(a, b) {
       var n = a.length, ma = 0, mb = 0, i;
       for (i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
       ma /= n; mb /= n;
@@ -581,7 +684,94 @@
         var u = a[i] - ma, v = b[i] - mb;
         num += u * v; da += u * u; db += v * v;
       }
-      return num / Math.sqrt(da * db || 1);
+      var slope = num / (da || 1);
+      return {
+        r: num / Math.sqrt(da * db || 1),
+        slope: slope,
+        at: function (x) { return mb + slope * (x - ma); }
+      };
+    }
+
+    // Lowercase a metric label for mid-sentence use, but leave a leading acronym alone
+    // so "CLIP caption agreement" does not come out as "clip caption agreement".
+    function lcLabel(s) {
+      var first = s.split(' ')[0];
+      return first === first.toUpperCase() && first.length > 1
+        ? s
+        : s.charAt(0).toLowerCase() + s.slice(1);
+    }
+
+    // Puts the coefficient in words. Beginners read "r = -0.13" as "there is a relationship";
+    // the job of this line is to gate that reading on whether it clears the noise band first.
+    function bands(n) {
+      // Two noise floors. The first is the textbook 95% band for a SINGLE test. But this panel
+      // lets you flip through every pairing of the metric list looking for the interesting one,
+      // which is exactly the behavior that inflates false positives -- with PAIRS comparisons
+      // the chance of at least one spurious hit is 1 - 0.95^PAIRS, not 5%. The second band
+      // divides alpha by the number of comparisons (Bonferroni) and is the one the verdict uses.
+      var df = Math.sqrt(Math.max(n - 1, 2));
+      return {
+        single: 1.96 / df,
+        family: zQuantile(1 - 0.05 / (2 * PAIRS)) / df,
+        anyHit: 1 - Math.pow(0.95, PAIRS)
+      };
+    }
+
+    function gloss(fit, n) {
+      var r = fit.r, a = Math.abs(r);
+      var xl = lcLabel(METRICS[xk].label), yl = lcLabel(METRICS[yk].label);
+      var bd = bands(n), crit = bd.family;
+      var pct = Math.round(r * r * 100);
+      var line = ' The dashed line is the best straight fit through all ' + n + ' points, and ' +
+        '<span class="mono">r&sup2; = ' + fmt(r * r, 2) + '</span> means ' + xl + ' accounts for ' +
+        pct + '% of the variation in ' + yl + '.';
+      var caveat = ' Pearson r only sees straight lines \u2014 a curved or clumped relationship can ' +
+        'still score near zero.';
+      var multi = ' The band above is corrected for the fact that this panel offers <b>' + PAIRS +
+        '</b> pairings: judged one at a time you would use <span class="mono">|r| \u2248 ' +
+        fmt(bd.single, 2) + '</span>, but flipping through all ' + PAIRS +
+        ' at that threshold gives roughly a <b>' + Math.round(bd.anyHit * 100) +
+        '%</b> chance of at least one spurious hit, so the floor moves to <span class="mono">|r| ' +
+        '\u2248 ' + fmt(bd.family, 2) + '</span>.';
+      var lead;
+      if (a < crit) {
+        lead = '<b>Inside the noise.</b> At <span class="mono">n = ' + n + '</span>, coefficients ' +
+          'under <span class="mono">|r| \u2248 ' + fmt(crit, 2) + '</span> turn up routinely when ' +
+          'there is no relationship at all, so <span class="mono">r = ' + fmt(r, 2) + '</span> is ' +
+          'not evidence that ' + xl + ' and ' + yl + ' are related.';
+      } else {
+        var strength = a < 0.3 ? 'weak' : a < 0.5 ? 'moderate' : a < 0.7 ? 'strong' : 'very strong';
+        lead = '<b>A ' + strength + ' ' + (r >= 0 ? 'positive' : 'negative') + ' trend.</b> As ' +
+          xl + ' goes up, ' + yl + ' tends to ' + (r >= 0 ? 'rise' : 'fall') + '. That clears the ' +
+          '<span class="mono">|r| \u2248 ' + fmt(crit, 2) + '</span> band you would expect from ' +
+          'noise alone at <span class="mono">n = ' + n + '</span>.';
+      }
+      return lead + line + caveat + multi;
+    }
+
+    /* A visual callout for r: where this coefficient falls against the two noise bands.
+       The number alone tells a beginner nothing about whether it is big. */
+    function drawMeter(fit, n) {
+      var host2 = $('.rmeter', host);
+      if (!host2) return;
+      var bd = bands(n), r = fit.r;
+      var pos = function (v) { return ((v + 1) / 2 * 100).toFixed(2) + '%'; };
+      var w = function (v) { return (v / 2 * 100).toFixed(2) + '%'; };
+      host2.innerHTML =
+        '<div class="rmeter-track">' +
+          '<i class="rm-band rm-family" style="left:' + pos(-bd.family) + ';width:' +
+            w(2 * bd.family) + '"></i>' +
+          '<i class="rm-band rm-single" style="left:' + pos(-bd.single) + ';width:' +
+            w(2 * bd.single) + '"></i>' +
+          '<i class="rm-zero" style="left:50%"></i>' +
+          '<i class="rm-mark' + (Math.abs(r) < bd.family ? ' is-noise' : '') +
+            '" style="left:' + pos(r) + '"></i>' +
+        '</div>' +
+        '<div class="rmeter-scale"><span>\u22121</span><span>0</span><span>+1</span></div>' +
+        '<div class="rmeter-key">shaded = coefficients this corpus produces by chance ' +
+          '(<span class="rm-sw rm-single"></span> one test, ' +
+          '<span class="rm-sw rm-family"></span> corrected for ' + PAIRS + ' pairings) \u00b7 ' +
+          '<span class="rm-sw rm-mark"></span> r = ' + fmt(r, 2) + '</div>';
     }
 
     function nearest(mx, my) {
@@ -690,6 +880,7 @@
     var detail = $('.paper-detail', host);
     var filter = 'all';
     var sel = null;
+    var textMode = 'corrected';        // 'corrected' | 'raw', persists across selections
 
     var CLUSTER_NAME = {};
     D.clusters.forEach(function (c) { CLUSTER_NAME[c.id] = c.name; });
@@ -766,13 +957,53 @@
       if (p.closest) kv('nearest real paper', p.closest);
       right.appendChild(dl);
 
-      if (p.abstract) {
-        right.appendChild(el('h4', null, 'What the page actually says'));
-        right.appendChild(el('div', 'excerpt', p.abstract));
-      }
-      if (p.refs) {
-        right.appendChild(el('h4', null, 'Its reference list'));
-        right.appendChild(el('div', 'excerpt', p.refs));
+      /* The text below is LLM-corrected, which only ever makes the page look better than its
+         pixels are. tools/page_ocr.py re-OCRs the same page image and ships what the corrector
+         was working from, so the gap is visible on all 100 pages rather than asserted once. */
+      var raw = PAGEOCR && PAGEOCR.pages[p.f];
+      if (p.abstract || raw) {
+        var head = el('div', 'excerpt-head');
+        head.appendChild(el('h4', null, 'What the page says'));
+        if (raw && raw.raw) {
+          var grp = el('span', 'controls');
+          [['corrected', 'LLM-corrected'], ['raw', 'raw OCR']].forEach(function (o) {
+            var b = el('button', 'btn', o[1]);
+            b.type = 'button';
+            b.setAttribute('aria-pressed', String(textMode === o[0]));
+            b.addEventListener('click', function () {
+              textMode = o[0];
+              select(p, p._node);
+            });
+            grp.appendChild(b);
+          });
+          head.appendChild(grp);
+        }
+        right.appendChild(head);
+
+        if (textMode === 'raw' && raw && raw.raw) {
+          right.appendChild(el('div', 'excerpt is-raw', raw.raw));
+          var note = el('p', 'dek');
+          note.style.marginTop = '.4rem';
+          note.textContent = 'Straight out of tesseract, nothing cleaned up. ' +
+            raw.tokens + ' word tokens, ' +
+            (raw.rate != null ? fmt(raw.rate * 100, 0) + '% of them in a dictionary' : 'rate undefined') +
+            (raw.conf != null ? ', mean confidence ' + fmt(raw.conf, 0) : '') + '.';
+          right.appendChild(note);
+        } else if (p.abstract) {
+          right.appendChild(el('div', 'excerpt', p.abstract));
+          if (p.refs) {
+            right.appendChild(el('h4', null, 'Its reference list'));
+            right.appendChild(el('div', 'excerpt', p.refs));
+          }
+          if (raw && raw.corr_rate != null && raw.rate != null) {
+            var g = el('p', 'dek');
+            g.style.marginTop = '.4rem';
+            g.innerHTML = 'Dictionary-word rate <b>' + fmt(raw.corr_rate * 100, 0) +
+              '%</b> here against <b>' + fmt(raw.rate * 100, 0) +
+              '%</b> in the raw OCR of the same page. Switch above to see what was corrected.';
+            right.appendChild(g);
+          }
+        }
       }
       detail.appendChild(right);
     }
@@ -788,6 +1019,316 @@
     });
 
     select(D.papers[0], D.papers[0]._node);
+  }
+
+  // ------------------------------------------------- 5b. permutation nulls
+
+  /* Two null distributions, drawn from the count-per-correct histograms in the bundle.
+     Accuracies are k/269, so the nulls are stored as a 270-long tally rather than 2,000
+     floats. The point of drawing them together is the offset between them: the width rule
+     searches 269 cut points, so its null starts at the majority baseline instead of 0.5. */
+  function initPermTest() {
+    var host = $('#permtest');
+    if (!host || !D || !D.lda.perm || !D.lda.perm.hist) return;
+    var canvas = $('canvas', host);
+    var N = D.lda.perm.n || (D.counts.gen_figs + D.counts.real_figs);
+
+    var series = [
+      { hist: D.lda.perm.hist, obs: D.lda.loo2, color: '--accent',
+        label: 'discriminant', tag: 'PC\u2081 + PC\u2082' },
+      { hist: D.provenance.perm.hist, obs: D.provenance.width_acc, color: '--ink-faint',
+        label: 'width threshold', tag: 'image width' }
+    ];
+
+    // Bin the k/N tallies into fixed 1-point-wide bins, then scale each curve to its own peak.
+    // The width rule's null is five times taller than the discriminant's because it is five times
+    // narrower -- on a shared count axis the broad curve would flatten into the baseline and the
+    // comparison that matters, where each null SITS, would be the hardest thing to see.
+    var NB = 100;
+    series.forEach(function (sr) {
+      var b = new Array(NB); for (var i = 0; i < NB; i++) b[i] = 0;
+      sr.hist.forEach(function (count, k) {
+        if (!count) return;
+        b[Math.min(NB - 1, Math.floor(k / N * NB))] += count;
+      });
+      var mx = Math.max.apply(null, b) || 1;
+      sr.bins = b.map(function (v) { return v / mx; });
+    });
+
+    var surf = new Surface(canvas, {
+      domain: { x: [0, 1], y: [0, 1.28] },
+      height: 250,
+      margin: { t: 34, r: 16, b: 40, l: 50 }
+    });
+
+    function draw() {
+      surf.clear();
+      var ctx = surf.ctx, i;
+      surf.axes('leave-one-out accuracy under shuffled labels', 'shuffles (each to its own peak)');
+
+      series.forEach(function (sr) {
+        var col = css(sr.color);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(surf.sx(0), surf.sy(0));
+        for (i = 0; i < NB; i++) {
+          var x0 = surf.sx(i / NB), x1 = surf.sx((i + 1) / NB), yv = surf.sy(sr.bins[i]);
+          ctx.lineTo(x0, yv); ctx.lineTo(x1, yv);
+        }
+        ctx.lineTo(surf.sx(1), surf.sy(0));
+        ctx.closePath();
+        ctx.fillStyle = col; ctx.globalAlpha = 0.28; ctx.fill();
+        ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.stroke();
+        ctx.restore();
+      });
+
+      // observed values, marked where they actually fall
+      ctx.save();
+      ctx.font = '600 11px ' + css('--sans').split(',')[0].replace(/"/g, '') + ', sans-serif';
+      series.forEach(function (sr, k) {
+        var px = surf.sx(sr.obs), col = css(sr.color);
+        ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(px, surf.m.t + (k ? 14 : 0)); ctx.lineTo(px, surf.m.t + surf.ih); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = col;
+        ctx.textAlign = px > surf.m.l + surf.iw * 0.72 ? 'right' : 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(sr.tag + ' \u2014 ' + fmt(sr.obs * 100, 1) + '%',
+          px + (ctx.textAlign === 'right' ? -6 : 6), surf.m.t + (k ? 16 : 2));
+      });
+      ctx.restore();
+    }
+
+    draw();
+    window.addEventListener('resize', function () { surf.resize(); draw(); });
+  }
+
+  // ------------------------------------------------- 6b. occlusion maps
+
+  /* Signed 7x7 patch-occlusion maps (tools/occlusion.py). Each row carries the figure's
+     unoccluded discriminant score and 49 raw deltas: how far the score moved when that one
+     32-pixel tile was replaced with the encoder's mean color.
+
+     The raw deltas are NOT what gets painted. Hiding any tile at all drags the score toward
+     "generated" -- the corpus mean delta is about -0.20, and 78% of all 13,181 deltas are
+     negative -- because removing information moves the embedding in a consistent direction
+     regardless of what was removed. Left uncorrected, every map would read as one solid blue
+     wash and the occlusion would be measuring its own artifact. So each figure's 49 deltas are
+     centered on that figure's own mean before they are colored, which asks the question that
+     was actually interesting: not "did hiding this tile move the score" (it always does) but
+     "did hiding THIS tile move it more, or less, than hiding an average tile of this figure".
+     After centering the signs split almost exactly evenly, which is what a corrected measure
+     should do. The raw value and the figure's baseline are both in the tooltip. */
+  var OCC = null;
+  var PAGEOCR = null;
+  var MASKABL = null;                // static/data/text_ablation.json, section 6                // static/data/page_ocr.json, loaded lazily for section 8
+
+  function initOcclusion() {
+    var host = $('#occlusion');
+    if (!host) return;
+    var stage = $('.occ-stage', host);
+    var btns = $$('[data-occ]', host);
+    var G = 7, SHOWN = 6, mode = 'gen', shuffleSeed = 1;
+
+    function fail(msg) {
+      host.innerHTML = '<p class="dek">' + msg + '</p>';
+    }
+
+    // Center each figure on its own mean delta (see the note above), then scale the color
+    // ramp to the corpus-wide 98th percentile of |centered delta| rather than to each figure's
+    // own maximum -- otherwise a figure the classifier barely cares about would look just as
+    // decisive as one it does.
+    var scale = 1;
+    function prepare() {
+      var all = [];
+      OCC.rows.forEach(function (r) {
+        var mean = 0, i;
+        for (i = 0; i < r.d.length; i++) mean += r.d[i];
+        mean /= r.d.length;
+        r.base = mean;
+        r.rel = r.d.map(function (v) { return v - mean; });
+        r.rel.forEach(function (v) { all.push(Math.abs(v)); });
+      });
+      all.sort(function (a, b) { return a - b; });
+      scale = all[Math.floor(all.length * 0.98)] || 1;
+    }
+
+    function verdict(r) { return r.s > 0 ? 'real' : 'generated'; }
+    function truth(r) { return r.c === 1 ? 'generated' : 'real'; }
+    function correct(r) { return verdict(r) === truth(r); }
+
+    function pick() {
+      var rows = OCC.rows.slice();
+      if (mode === 'gen') {
+        rows = rows.filter(function (r) { return r.c === 1 && correct(r); })
+                   .sort(function (a, b) { return a.s - b.s; });
+      } else if (mode === 'real') {
+        rows = rows.filter(function (r) { return r.c === 0 && correct(r); })
+                   .sort(function (a, b) { return b.s - a.s; });
+      } else if (mode === 'miss') {
+        rows = rows.filter(function (r) { return !correct(r); })
+                   .sort(function (a, b) { return Math.abs(b.s) - Math.abs(a.s); });
+      } else {
+        var rand = rng(shuffleSeed);
+        rows.sort(function () { return rand() - 0.5; });
+      }
+      return rows.slice(0, SHOWN);
+    }
+
+    function ramp(v) {
+      // v > 0: hiding this tile moved the score toward "real", so the tile argued
+      // "generated" -- paint it with the generated color, and vice versa.
+      var t = Math.max(-1, Math.min(1, v / scale));
+      var c = t > 0 ? css('--real') : css('--ai');
+      return { fill: c, alpha: Math.pow(Math.abs(t), 0.7) * 0.72 };
+    }
+
+    function render() {
+      stage.innerHTML = '';
+      var tip = new Tip(stage);
+      pick().forEach(function (r) {
+        var card = el('figure', 'occ-card');
+        var frame = el('div', 'occ-frame');
+        var img = el('img');
+        img.src = figSrc(r, false);
+        img.alt = (r.c === 1 ? 'Generated' : 'Real') + ' figure ' + r.n;
+        img.loading = 'lazy';
+        frame.appendChild(img);
+
+        var grid = el('div', 'occ-grid');
+        r.rel.forEach(function (v, i) {
+          var cell = el('i');
+          var k = ramp(v);
+          cell.style.background = k.fill;
+          cell.style.opacity = k.alpha.toFixed(3);
+          cell.addEventListener('mousemove', function (e) {
+            var b = stage.getBoundingClientRect();
+            tip.show('<span class="tip-k">tile ' + ((i / G | 0) + 1) + ',' + (i % G + 1) +
+              '</span>' + fmt(v, 3) + ' against this figure\'s average tile — hiding it argues <b>' +
+              (v > 0 ? 'generated' : 'real') + '</b>' +
+              '<br><span style="opacity:.65">raw ' + fmt(r.d[i], 3) +
+              ', baseline ' + fmt(r.base, 3) + '</span>',
+              e.clientX - b.left, e.clientY - b.top);
+          });
+          cell.addEventListener('mouseleave', function () { tip.hide(); });
+          grid.appendChild(cell);
+        });
+        frame.appendChild(grid);
+        frame.addEventListener('click', function () {
+          openLightbox(figSrc(r, true), img.alt,
+            { rel: r.rel, raw: r.d, base: r.base, ramp: ramp, G: G });
+        });
+        card.appendChild(frame);
+
+        var cap = el('figcaption');
+        cap.innerHTML = '<b class="' + (r.c === 1 ? 'gen' : 'rl') + '">' +
+          (r.c === 1 ? 'generated' : 'real') + '</b> · score ' + fmt(r.s, 2) +
+          ' · called <b>' + verdict(r) + '</b>' +
+          (correct(r) ? '' : ' <span class="occ-miss">✕ wrong</span>');
+        card.appendChild(cap);
+        stage.appendChild(card);
+      });
+    }
+
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.getAttribute('data-occ') === 'shuffle' && mode === 'shuffle') shuffleSeed++;
+        mode = b.getAttribute('data-occ');
+        btns.forEach(function (o) {
+          o.setAttribute('aria-pressed', String(o === b));
+        });
+        render();
+      });
+    });
+
+    fetch('static/data/occlusion.json')
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        OCC = json;
+        // Rows are keyed by filename and class, the same pair figSrc() resolves against.
+        prepare();
+        fillOccNumbers(OCC.summary);
+        render();
+      })
+      .catch(function (err) {
+        console.error('arxAIv: could not load occlusion maps', err);
+        fail('This interactive needs <code>static/data/occlusion.json</code>. Regenerate it with ' +
+          '<code>tools/occlusion.py</code>, or serve this folder over HTTP if you opened the file ' +
+          'from disk.');
+      });
+  }
+
+  /* Numbers in the section 6 prose that come out of the occlusion bundle rather than the
+     main one, so they land after its own fetch resolves. Written once, from tools/textmask.py,
+     so the prose cannot drift from the measurement. */
+  function fillOccNumbers(sm) {
+    if (!sm) return;
+    function pct(v, p) { return fmt(v * 100, p == null ? 0 : p) + '%'; }
+    function signed(v, p) { return (v > 0 ? '+' : '\u2212') + fmt(Math.abs(v), p); }
+    var vals = {
+      'bias-frac': pct(sm.bias_frac_neg),
+      'bias-mean': signed(sm.bias_mean, 2),
+      'top5': pct(sm.top5_share),
+      'noflip': pct(1 - sm.flip_frac),
+      'gen-text': fmt(sm.text.gen.text, 3),
+      'gen-nontext': fmt(sm.text.gen.nontext, 3),
+      'gen-diff': signed(sm.text.gen.diff, 3),
+      'gen-ci': '[' + signed(sm.text.gen.ci[0], 3) + ', ' + signed(sm.text.gen.ci[1], 3) + ']',
+      'gen-frac': pct(sm.text.gen.frac_figs),
+      'real-diff': signed(sm.text.real.diff, 3),
+      'real-ci': '[' + signed(sm.text.real.ci[0], 3) + ', ' + signed(sm.text.real.ci[1], 3) + ']',
+      'real-frac': pct(sm.text.real.frac_figs),
+      'ocr-gen': pct(sm.ocr.gen.detected_frac),
+      'ocr-real': pct(sm.ocr.real.detected_frac),
+      'ocr-gen-p': fmt(sm.ocr.gen.mean_patches, 1),
+      'ocr-real-p': fmt(sm.ocr.real.mean_patches, 1)
+    };
+    $$('[data-occ-n]').forEach(function (n) {
+      var k = n.getAttribute('data-occ-n');
+      if (vals[k] != null) n.textContent = vals[k];
+    });
+  }
+
+  /* Section 8's raw OCR. Optional: if the file is missing the archive still renders, it just
+     loses the corrected/raw toggle, so the page degrades to how it behaved before. */
+  function initPageOcr() {
+    if (!$('#paper-explorer')) return;
+    fetch('static/data/page_ocr.json')
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        PAGEOCR = json;
+        fillNumbers();
+        var open = $('.paper-cell.sel', $('#paper-explorer'));
+        if (open) open.click();          // redraw the detail panel now the raw text exists
+      })
+      .catch(function () { PAGEOCR = null; });
+  }
+
+  /* Section 6's text-removal experiment (tools/ablate_text.py). Three conditions, each a full
+     refit. The random-masked control is drawn between the other two on purpose: the reader should
+     see that blanking pixels at random costs almost nothing before they read the text bar. */
+  function initMaskAblation() {
+    var host = $('#mask-ablation');
+    if (!host) return;
+    fetch('static/data/text_ablation.json')
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        MASKABL = json;
+        var c = json.conditions;
+        bars('#mask-bars', [
+          { label: 'Original figures', v: c.original.acc * 100, kind: 'real', acc: c.original.acc },
+          { label: 'Random boxes masked (control)', v: c.random_masked.acc * 100, kind: 'none',
+            acc: c.random_masked.acc },
+          { label: 'Text masked', v: c.text_masked.acc * 100, kind: 'mutated',
+            acc: c.text_masked.acc }
+        ], { fmt: function (r) { return fmt(r.acc * 100, 1) + '%'; } });
+        fillNumbers();
+      })
+      .catch(function () {
+        host.innerHTML = '<p class="dek">This figure needs ' +
+          '<code>static/data/text_ablation.json</code>; rebuild it with ' +
+          '<code>tools/ablate_text.py</code>.</p>';
+      });
   }
 
   // ------------------------------------------------- 7. number injection
@@ -815,7 +1356,16 @@
       'sim-r2r': fmt(D.clip_sim.r2r, 3),
       'sim-g2r': fmt(D.clip_sim.g2r, 3),
       'gib-mean': fmt(D.metric_summary.gib.mean, 3),
-      'gib-max': fmt(D.metric_summary.gib.max, 3),
+      'gib-max': fmt(D.metric_summary.gib.max, 2),
+      'gib-med': fmt(D.metric_summary.gib.med, 2),
+      'gib-zero': D.metric_summary.gib.zero,
+      'gib-n': D.metric_summary.gib.n,
+      'gib-undef': D.metric_summary.gib.undefined,
+      'tok-med': D.metric_summary.tok.med,
+      'tok-mean': fmt(D.metric_summary.tok.mean, 1),
+      'tok-max': D.metric_summary.tok.max,
+      'tok-le3': D.metric_summary.tok.le3,
+      'tok-le5': D.metric_summary.tok.le5,
       'clip-mean': fmt(D.metric_summary.clip.mean, 3),
       'clip-min': fmt(D.metric_summary.clip.min, 3),
       'cplx-mean': fmt(D.metric_summary.cplx.mean, 1),
@@ -824,11 +1374,90 @@
       'notitle': D.papers.filter(function (p) { return !p.title || p.title === 'None'; }).length,
       'pixel-acc': fmt(D.ablation[1].acc * 100, 1) + '%',
       'both-acc': fmt(D.ablation[4].acc * 100, 1) + '%',
-      'pixel-best-auc': fmt(Math.max.apply(null, D.pixel.rows.map(function (r) { return r.auc; })), 3)
+      'pixel-best-auc': fmt(Math.max.apply(null, D.pixel.rows.map(function (r) { return r.auc; })), 3),
+      // section 4 — how much of the corpus the two map axes actually hold
+      'evr1': fmt(D.pca.evr[0], 1) + '%',
+      'evr2': fmt(D.pca.evr[1], 1) + '%',
+      'evr12': fmt(D.pca.cum[1], 1) + '%',
+      'evr123': fmt(D.pca.cum[2], 1) + '%',
+      // section 5 — the discriminant written out, straight from the fitted weights
+      'lda-w1': fmt(Math.abs(D.lda.w[0]), 3),
+      'lda-w2': fmt(Math.abs(D.lda.w[1]), 3),
+      'lda-t': fmt(D.lda.t, 3),
+      // sections 6 and 11 — the provenance confound
+      'gen-w': D.provenance.gen_w_med,
+      'real-w': D.provenance.real_w_med,
+      'width-acc': fmt(D.provenance.width_acc * 100, 1) + '%',
+      'width-t': D.provenance.width_thresh,
+      'width-wrong': D.provenance.width_wrong,
+      'occ-passes': group((D.counts.gen_figs + D.counts.real_figs) * 49),
+      // section 5 — the permutation test and the bootstrap interval
+      'perm-b': group(D.lda.perm.B),
+      'perm-null': fmt(D.lda.perm.null_mean * 100, 1) + '%',
+      'perm-sd': fmt(D.lda.perm.null_sd * 100, 1),
+      'perm-max': fmt(D.lda.perm.null_max * 100, 1) + '%',
+      'perm-sd-above': fmt(D.lda.perm.sd_above, 1),
+      'perm-p': D.lda.perm.p,
+      'lda-ci': fmt(D.lda.perm.ci[0] * 100, 1) + '% to ' + fmt(D.lda.perm.ci[1] * 100, 1) + '%',
+      'width-null': fmt(D.provenance.perm.null_mean * 100, 1) + '%',
+      // section 9 — surname concentration
+      'conc-n': D.names.conc.n_authors,
+      'conc-distinct': D.names.conc.n_distinct,
+      'conc-ratio': fmt(D.names.conc.distinct_ratio, 2),
+      'conc-h': fmt(D.names.conc.entropy, 2),
+      'conc-hmax': fmt(D.names.conc.entropy_max, 2),
+      'conc-top1': fmt(D.names.conc.top1, 1) + '%',
+      'conc-top10': fmt(D.names.conc.top10, 1) + '%',
+      'conc-gini': fmt(D.names.conc.gini, 3),
+      'conc-doe': D.names.conc.doe,
+      // section 10 — does the title embedding recover the subtopics?
+      'q-labels': fmt(D.clusters_check.q_labels, 2),
+      'q-spectral': fmt(D.clusters_check.q_spectral5, 2),
+      'q-ari': fmt(D.clusters_check.ari, 2),
+      'q-links': D.clusters_check.n_links
     };
+    // section 8 — how far the correction pass moved the text. Only available once
+    // page_ocr.json has loaded, so these fill on the second call to fillNumbers().
+    if (PAGEOCR && PAGEOCR.summary) {
+      var sm = PAGEOCR.summary;
+      vals['ocr-raw-rate'] = fmt(sm.raw_rate * 100, 0) + '%';
+      vals['ocr-corr-rate'] = fmt(sm.corr_rate * 100, 0) + '%';
+      vals['ocr-gap'] = fmt(sm.gap * 100, 0);
+      vals['ocr-corr-higher'] = fmt(sm.corr_higher * 100, 0) + '%';
+      vals['ocr-conf'] = fmt(sm.mean_conf, 0);
+      vals['ocr-tokens'] = fmt(sm.mean_tokens, 0);
+      vals['ocr-n'] = sm.n;
+      vals['ocr-body-rate'] = fmt(sm.body_rate * 100, 0) + '%';
+      vals['ocr-body-gap'] = fmt(sm.body_gap * 100, 0);
+    }
+    // section 6 — what survives with the text removed
+    if (MASKABL) {
+      var c = MASKABL.conditions, mc = MASKABL.mcnemar, base = D.lda.baseline;
+      vals['mask-orig'] = fmt(c.original.acc * 100, 1) + '%';
+      vals['mask-random'] = fmt(c.random_masked.acc * 100, 1) + '%';
+      vals['mask-text'] = fmt(c.text_masked.acc * 100, 1) + '%';
+      vals['mask-null'] = fmt(c.text_masked.null_mean * 100, 1) + '%';
+      vals['mask-gap'] = fmt((c.random_masked.acc - c.text_masked.acc) * 100, 1);
+      vals['mask-p'] = fmt(mc.text_vs_random.p, 3);
+      vals['mask-ctrl-p'] = fmt(mc.random_vs_original.p, 2);
+      // share of the above-baseline signal that the text was carrying
+      vals['mask-share'] = Math.round(100 * (c.random_masked.acc - c.text_masked.acc) /
+                                      (c.random_masked.acc - base)) + '%';
+      vals['mask-area-gen'] = fmt(MASKABL.masked_frac.gen * 100, 1) + '%';
+      vals['mask-area-real'] = fmt(MASKABL.masked_frac.real * 100, 1) + '%';
+    }
     $$('[data-n]').forEach(function (n) {
       var k = n.getAttribute('data-n');
       if (vals[k] != null) n.textContent = vals[k];
+    });
+
+    // The cosine-similarity bars are scaled from the same numbers that print beside them,
+    // so the two cannot drift apart when the underlying values are recomputed.
+    var sims = { g2g: D.clip_sim.g2g, r2r: D.clip_sim.r2r, g2r: D.clip_sim.g2r };
+    var top = Math.max(sims.g2g, sims.r2r, sims.g2r);
+    $$('[data-bar]').forEach(function (b) {
+      var v = sims[b.getAttribute('data-bar')];
+      if (v != null && top > 0) b.style.width = (100 * v / top).toFixed(1) + '%';
     });
   }
 
@@ -860,6 +1489,10 @@
     initMetrics();
     initBars();
     initPapers();
+    initPermTest();
+    initOcclusion();
+    initPageOcr();
+    initMaskAblation();
   }
 
   initProgress();   // chrome that doesn't depend on the data bundle

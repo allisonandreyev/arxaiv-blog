@@ -17,7 +17,7 @@
   --real: #e2690b;        /* real, human-made */
   --real-soft: #fdeada;
 
-  /* UI accent, deliberately NOT one of the data colours, so a coloured word in the
+  /* UI accent, deliberately NOT one of the data colors, so a colored word in the
      prose always means the thing it means in the charts. */
   --accent: #0f766e;
   --accent-soft: #e0f2f0;
@@ -228,7 +228,7 @@ a {
 a:hover { background-size: 100% 2px; }
 
 /* ------------------------------------------------ inline data-coded terms
-   The words "generated" and "real" are printed in the same two colours the
+   The words "generated" and "real" are printed in the same two colors the
    charts use, so the prose and the marks are one vocabulary. */
 .gen, .rl {
   font-weight: 600;
@@ -448,6 +448,8 @@ figcaption b { color: var(--ink); font-weight: 600; }
   margin-right: 0.4em;
   vertical-align: 0.02em;
 }
+.swatch.perm-lda { background: var(--accent); }
+.swatch.perm-width { background: var(--ink-faint); }
 .swatch.ai { background: var(--ai); }
 .swatch.real { background: var(--real); }
 
@@ -531,7 +533,7 @@ figcaption b { color: var(--ink); font-weight: 600; }
 }
 
 /* Blur is applied to BOTH cards equally, to take the cheapest tell — unreadable
-   glyphs — off the table and force a judgement about structure instead. It lifts
+   glyphs — off the table and force a judgment about structure instead. It lifts
    as soon as the round is answered so the giveaway is still visible afterwards. */
 .quiz-stage.blurred .quiz-card:not(.revealed) img { filter: blur(2.6px); }
 .quiz-card.locked { cursor: default; }
@@ -646,6 +648,52 @@ svg.chart .lbl-strong { fill: var(--ink-soft); font-weight: 600; }
 .bar-fill.none { background: var(--rule-strong); }
 .bar-val { font-variant-numeric: tabular-nums; color: var(--ink-faint); min-width: 3.4rem; text-align: right; }
 
+/* ---------------------------------------------------------------- r meter (s7) */
+
+/* Where this correlation falls against the coefficients the corpus produces by chance.
+   The shaded bands are the whole point: r = 0.2 reads as "a relationship" until you can
+   see how wide the noise is at this sample size. */
+.rmeter { font-family: var(--sans); margin-top: 0.9rem; }
+.rmeter-track {
+  position: relative;
+  height: 0.85rem;
+  background: var(--bg-sunken);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.rmeter-track .rm-band { position: absolute; top: 0; bottom: 0; display: block; }
+.rm-family { background: var(--rule-strong); opacity: 0.55; }
+.rm-single { background: var(--rule-strong); opacity: 0.75; }
+.rm-zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink-faint); opacity: 0.5; }
+.rm-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+.rm-mark.is-noise { background: var(--ink-faint); }
+.rmeter-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.15rem;
+}
+.rmeter-key { font-size: 0.72rem; color: var(--ink-faint); margin-top: 0.35rem; line-height: 1.5; }
+.rm-sw {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.6rem;
+  border-radius: 2px;
+  vertical-align: -0.05rem;
+  margin-right: 0.15rem;
+}
+.rm-sw.rm-mark { position: static; width: 2px; margin: 0 0.3rem 0 0.15rem; top: auto; bottom: auto; }
+
 /* ---------------------------------------------------------------- paper explorer */
 
 .paper-grid {
@@ -706,6 +754,30 @@ svg.chart .lbl-strong { fill: var(--ink-soft); font-weight: 600; }
   margin-top: 0.35rem;
 }
 
+/* corrected / raw-OCR switch on the paper detail panel */
+.excerpt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+}
+.excerpt-head h4 { font-size: 0.8rem; color: var(--ink-faint); letter-spacing: 0.04em; }
+.excerpt-head .controls { gap: 0.25rem; }
+.excerpt-head .btn { font-size: 0.7rem; padding: 0.1rem 0.42rem; }
+.paper-meta .excerpt-head + .excerpt { margin-top: 0.35rem; }
+
+/* raw OCR is meant to look like what it is */
+.excerpt.is-raw {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  border-left-color: var(--warn);
+  max-height: 14rem;
+}
+
 .tagset { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.55rem; }
 .tag {
   font-size: 0.73rem;
@@ -719,6 +791,108 @@ svg.chart .lbl-strong { fill: var(--ink-soft); font-weight: 600; }
 }
 .tag.bad { color: var(--warn); border-color: var(--warn); background: transparent; }
 .tag.ok { color: var(--ok); border-color: var(--ok); background: transparent; }
+
+/* ---------------------------------------------------------------- encoder pipeline (s3) */
+
+svg.pipeline {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: var(--sans);
+}
+
+/* the numbered walk-through under it */
+ol.steps {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  line-height: 1.62;
+  color: var(--ink-soft);
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin: 1.6rem 0;
+}
+ol.steps li {
+  position: relative;
+  padding-left: 2.1rem;
+  counter-increment: step;
+}
+ol.steps li + li { margin-top: 0.75rem; }
+ol.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0.08rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+ol.steps b { color: var(--ink); }
+
+/* the discriminant written out as arithmetic (s5) */
+.formula {
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  background: var(--bg-sunken);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.9rem 0;
+  text-align: center;
+  color: var(--ink);
+  overflow-x: auto;
+}
+.formula span { color: var(--ink-faint); }
+
+/* ---------------------------------------------------------------- occlusion maps (s6) */
+
+.occ-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+  position: relative;
+}
+.occ-card { margin: 0; }
+.occ-frame {
+  position: relative;
+  aspect-ratio: 1 / 1;      /* short side to 224 + center crop, exactly as preprocess does it */
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  overflow: hidden;
+  background: #fff;
+  cursor: zoom-in;
+}
+.occ-frame img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.occ-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+}
+.occ-grid i {
+  display: block;
+  transition: outline-color 0.1s ease;
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+}
+.occ-grid i:hover { outline-color: var(--ink); }
+.occ-card figcaption {
+  font-family: var(--sans);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--ink-faint);
+  text-align: left;
+  margin-top: 0.4rem;
+}
+.occ-card figcaption b.gen { color: var(--ai); }
+.occ-card figcaption b.rl { color: var(--real); }
+.occ-miss { color: var(--warn); font-weight: 600; }
 
 /* ---------------------------------------------------------------- callouts */
 
@@ -742,6 +916,9 @@ svg.chart .lbl-strong { fill: var(--ink-soft); font-weight: 600; }
 }
 .aside p + p { margin-top: 0.7rem; }
 .aside.caution { border-left-color: var(--warn); }
+/* the closing "what transfers" block on sections 7-10: the method, lifted off the corpus */
+.aside.transfers { border-left-color: var(--ok); background: var(--bg-sunken); }
+.aside.transfers h4 { color: var(--ok); }
 .aside.caution h4 { color: var(--warn); }
 
 /* the three-row cosine-similarity readout inside the "how to read a distance" aside */
@@ -860,7 +1037,30 @@ svg.chart .lbl-strong { fill: var(--ink-soft); font-weight: 600; }
   padding: 2rem;
 }
 .lightbox.open { display: flex; }
-.lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; background: #fff; }
+.lightbox-media { position: relative; max-width: 100%; max-height: 100%; display: flex; }
+.lightbox-media img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; background: #fff; display: block; }
+/* Patch mode (an occlusion figure): crop to the same square the encoder sees -- object-fit:
+   cover on a 1:1 frame, exactly like .occ-frame -- so the 7x7 grid below lines up with the
+   image pixel-for-pixel, only bigger. */
+.lightbox-media.has-grid { width: min(80vw, 80vh, 640px); aspect-ratio: 1 / 1; }
+.lightbox-media.has-grid img { width: 100%; height: 100%; object-fit: cover; }
+.lightbox-grid {
+  position: absolute;
+  inset: 0;
+  display: none;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.lightbox-media.has-grid .lightbox-grid { display: grid; }
+.lightbox-grid i {
+  display: block;
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  transition: outline-color 0.1s ease;
+}
+.lightbox-grid i:hover { outline-color: rgba(255, 255, 255, 0.85); }
 .lightbox-close {
   position: absolute;
   top: 1rem;
