@@ -1479,6 +1479,39 @@
     update();
   }
 
+  // ------------------------------------------------- 3D embed highlight controls
+  // The force-graph iframes listen for postMessage highlight requests; the buttons
+  // above each one pick what stays lit (null = everything).
+
+  function initEmbedControls() {
+    var EMBEDS = {
+      'hero-map': function (v) {
+        return { type: 'highlightFigureType', figureType: v === 'all' ? null : v };
+      },
+      'title-graph': function (v) {
+        return { type: 'highlightCluster', cluster: v === 'all' ? null : Number(v) };
+      }
+    };
+    $$('.embed-controls').forEach(function (bar) {
+      var frame = document.getElementById(bar.dataset.embed);
+      var toMsg = EMBEDS[bar.dataset.embed];
+      if (!frame || !toMsg) return;
+      var current = 'all';
+      var send = function () {
+        if (frame.contentWindow) frame.contentWindow.postMessage(toMsg(current), '*');
+      };
+      $$('.btn', bar).forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          current = btn.dataset.show;
+          $$('.btn', bar).forEach(function (b) { b.setAttribute('aria-pressed', String(b === btn)); });
+          send();
+        });
+      });
+      // a lazy iframe may load after a click, so resend the current choice
+      frame.addEventListener('load', send);
+    });
+  }
+
   // ------------------------------------------------- boot
 
   function boot() {
@@ -1496,6 +1529,7 @@
   }
 
   initProgress();   // chrome that doesn't depend on the data bundle
+  initEmbedControls();
 
   fetch('static/data/arxaiv.json')
     .then(function (r) { return r.json(); })

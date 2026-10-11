@@ -72,7 +72,12 @@
 
   <div class="fig-full hero-block">
     <figure>
-      <iframe class="embed3d is-hero" src="static/maps/both_figures.html"
+      <div class="controls embed-controls" data-embed="hero-map">
+        <button class="btn" type="button" data-show="all" aria-pressed="true">Both</button>
+        <button class="btn ai" type="button" data-show="generated" aria-pressed="false">Generated only</button>
+        <button class="btn real" type="button" data-show="real" aria-pressed="false">Real only</button>
+      </div>
+      <iframe id="hero-map" class="embed3d is-hero" src="static/maps/both_figures.html"
               title="3D graph of 269 generated and real scientific figures"></iframe>
       <figcaption><b>Physics-enforced 3D embedding representation map</b>
         <span data-n="gen-figs">156</span> of these were drawn by an image model
@@ -911,7 +916,15 @@
 
   <div class="fig-full">
     <figure>
-      <iframe class="embed3d" src="static/maps/papers-glow.html" title="3D graph of 100 generated paper titles" loading="lazy"></iframe>
+      <div class="controls embed-controls" data-embed="title-graph">
+        <button class="btn" type="button" data-show="all" aria-pressed="true">All clusters</button>
+        <button class="btn" type="button" data-show="1" aria-pressed="false">Object detection</button>
+        <button class="btn" type="button" data-show="2" aria-pressed="false">Segmentation</button>
+        <button class="btn" type="button" data-show="3" aria-pressed="false">Generation</button>
+        <button class="btn" type="button" data-show="4" aria-pressed="false">Localization</button>
+        <button class="btn" type="button" data-show="5" aria-pressed="false">Features</button>
+      </div>
+      <iframe id="title-graph" class="embed3d" src="static/maps/papers-glow.html" title="3D graph of 100 generated paper titles" loading="lazy"></iframe>
       <figcaption><b>The title graph, in three dimensions.</b> Drag to rotate, scroll to zoom.
         Each node is one of the hundred papers; edges join titles that are close
         in sentence-embedding space.</figcaption>

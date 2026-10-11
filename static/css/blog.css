@@ -979,6 +979,8 @@ ol.steps b { color: var(--ink); }
 
 .hero-block { margin-top: 2rem; }
 
+.embed-controls { margin-bottom: 0.6rem; }
+
 /* The hero map is nearly full-bleed, so a 40rem caption pinned to its left edge
    reads as orphaned. Let this one run the full width of the map instead. */
 .hero-block figcaption {
